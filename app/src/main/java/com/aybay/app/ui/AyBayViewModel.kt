@@ -1,0 +1,113 @@
+package com.aybay.app.ui
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.aybay.app.data.AppDatabase
+import com.aybay.app.data.Budget
+import com.aybay.app.data.DueItem
+import com.aybay.app.data.FirebaseSync
+import com.aybay.app.data.Note
+import com.aybay.app.data.Account
+import com.aybay.app.data.Repository
+import com.aybay.app.data.Transaction
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+class AyBayViewModel(app: Application) : AndroidViewModel(app) {
+    private val db = AppDatabase.get(app)
+    private val repo = Repository(db.dao())
+    val sync = FirebaseSync(app)
+
+    val transactions: StateFlow<List<Transaction>> = repo.transactions()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val totalsAll: StateFlow<com.aybay.app.data.Totals> = repo.totalsAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.aybay.app.data.Totals())
+    val dueItems: StateFlow<List<DueItem>> = repo.dueItems()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val notes: StateFlow<List<Note>> = repo.notes()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val accounts: StateFlow<List<Account>> = repo.accounts()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun totalsOfMonth(monthPrefix: String) = repo.totalsOfMonth(monthPrefix)
+    fun categoryTotals(monthPrefix: String, type: String) =
+        repo.categoryTotals(monthPrefix, type)
+    fun transactionsOfMonth(monthPrefix: String) = repo.transactionsOfMonth(monthPrefix)
+    fun budgetsOfMonth(monthKey: String) = repo.budgetsOfMonth(monthKey)
+
+    fun addTransaction(item: Transaction) {
+        viewModelScope.launch {
+            val id = repo.addTransaction(item)
+            if (sync.isAvailable && sync.isSignedIn) {
+                val ok = sync.pushTransaction(item.copy(id = id.toInt()))
+                if (ok) repo.markTransactionSynced(id.toInt())
+            }
+        }
+    }
+
+    fun deleteTransaction(item: Transaction) {
+        viewModelScope.launch { repo.deleteTransaction(item) }
+    }
+
+    fun addDueItem(item: DueItem) {
+        viewModelScope.launch {
+            val id = repo.addDueItem(item)
+            if (sync.isAvailable && sync.isSignedIn) {
+                sync.pushDueItem(item.copy(id = id.toInt()))
+            }
+        }
+    }
+
+    fun updateDueItem(item: DueItem) {
+        viewModelScope.launch { repo.updateDueItem(item) }
+    }
+
+    fun deleteDueItem(item: DueItem) {
+        viewModelScope.launch { repo.deleteDueItem(item) }
+    }
+
+    fun addBudget(item: Budget) {
+        viewModelScope.launch { repo.addBudget(item) }
+    }
+
+    fun updateBudget(item: Budget) {
+        viewModelScope.launch { repo.updateBudget(item) }
+    }
+
+    fun addNote(item: Note) {
+        viewModelScope.launch {
+            val id = repo.addNote(item)
+            if (sync.isAvailable && sync.isSignedIn) {
+                sync.pushNote(item.copy(id = id.toInt()))
+            }
+        }
+    }
+
+    fun updateNote(item: Note) {
+        viewModelScope.launch { repo.updateNote(item) }
+    }
+
+    fun deleteNote(item: Note) {
+        viewModelScope.launch { repo.deleteNote(item) }
+    }
+
+    fun addAccount(item: Account) {
+        viewModelScope.launch { repo.addAccount(item) }
+    }
+
+    private var defaultEnsured = false
+
+    fun ensureDefaultAccount() {
+        if (defaultEnsured) return
+        defaultEnsured = true
+        viewModelScope.launch {
+            val current = accounts.value
+            if (current.isEmpty()) {
+                repo.addAccount(Account(name = "হাতে নগদ", kind = "ক্যাশ", balance = 0L))
+            }
+        }
+    }
+}

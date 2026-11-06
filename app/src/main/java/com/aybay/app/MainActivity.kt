@@ -1,0 +1,327 @@
+package com.aybay.app
+
+import android.os.Bundle
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Note
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import androidx.biometric.BiometricPrompt
+import com.aybay.app.ui.AddFormScreen
+import com.aybay.app.ui.AppPrefs
+import com.aybay.app.ui.AyBayViewModel
+import com.aybay.app.ui.BudgetScreen
+import com.aybay.app.ui.DueScreen
+import com.aybay.app.ui.GreenDark
+import com.aybay.app.ui.HomeScreen
+import com.aybay.app.ui.LangState
+import com.aybay.app.ui.NotesScreen
+import com.aybay.app.ui.ReportScreen
+import com.aybay.app.ui.SettingsScreen
+import com.aybay.app.ui.isEnglishPref
+import com.aybay.app.ui.loadAppPrefs
+import com.aybay.app.ui.parseBackupJson
+import com.aybay.app.ui.saveAppPrefs
+import com.aybay.app.ui.tr
+
+@OptIn(ExperimentalMaterial3Api::class)
+class MainActivity : FragmentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        LangState.isEnglish = isEnglishPref(this)
+        setContent {
+            val viewModel: AyBayViewModel = viewModel()
+            viewModel.ensureDefaultAccount()
+            var prefs by remember { mutableStateOf(loadAppPrefs(this)) }
+            var unlocked by remember { mutableStateOf(false) }
+            val needsLock = prefs.pin.isNotBlank() && !unlocked
+            if (needsLock) {
+                LockScreen(
+                    prefs = prefs,
+                    onUnlocked = { unlocked = true },
+                    activity = this
+                )
+            } else {
+                AyBayApp(
+                    viewModel = viewModel,
+                    prefs = prefs,
+                    onPrefsChange = { next ->
+                        prefs = next
+                        LangState.isEnglish = next.language == "en"
+                        saveAppPrefs(this, next)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPrefs) -> Unit) {
+    val context = LocalContext.current
+    val navController = rememberNavController()
+    val backStack by navController.currentBackStackEntryAsState()
+    val route = backStack?.destination?.route ?: "home"
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val text = context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText() ?: ""
+                val items = parseBackupJson(text)
+                for (item in items) {
+                    viewModel.addTransaction(item)
+                }
+            } catch (e: Exception) {
+            }
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "৳",
+                            modifier = Modifier
+                                .background(GreenDark, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = " " + tr("আয় - ব্যয়", "Ay - Bay"),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { navController.navigate("report") }) {
+                        Icon(imageVector = Icons.Default.Search, contentDescription = tr("খুঁজুন", "Search"))
+                    }
+                    IconButton(onClick = { navController.navigate("notes") }) {
+                        Icon(imageVector = Icons.Default.Note, contentDescription = tr("নোট", "Notes"))
+                    }
+                    IconButton(onClick = { navController.navigate("settings") }) {
+                        Icon(imageVector = Icons.Default.Menu, contentDescription = tr("মেনু", "Menu"))
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+            )
+        },
+        bottomBar = {
+            NavigationBar(containerColor = Color.White) {
+                val items = listOf(
+                    "home" to tr("হোম", "Home"),
+                    "due" to tr("বাকি ও ধার", "Due & Loan"),
+                    "budget" to tr("বাজেট ও খাত", "Budget"),
+                    "report" to tr("রিপোর্ট", "Report"),
+                    "more" to tr("আরও", "More")
+                )
+                val icons = listOf(
+                    Icons.Default.Home,
+                    Icons.Default.AccountBalanceWallet,
+                    Icons.Default.Assessment,
+                    Icons.Default.Menu,
+                    Icons.Default.MoreHoriz
+                )
+                for ((index, item) in items.withIndex()) {
+                    val selected = route == item.first ||
+                        (item.first == "more" && (route == "notes" || route == "settings"))
+                    NavigationBarItem(
+                        selected = selected,
+                        onClick = { navController.navigate(item.first) },
+                        icon = { Icon(imageVector = icons[index], contentDescription = item.second) },
+                        label = { Text(text = item.second, fontSize = 11.sp) }
+                    )
+                }
+            }
+        }
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            NavHost(navController = navController, startDestination = "home") {
+                composable("home") {
+                    HomeScreen(
+                        viewModel = viewModel,
+                        onAdd = { type -> navController.navigate("add/" + type) },
+                        onOpenDue = { navController.navigate("due") }
+                    )
+                }
+                composable(
+                    "add/{type}",
+                    arguments = listOf(navArgument("type") { type = NavType.StringType })
+                ) { entry ->
+                    val type = entry.arguments?.getString("type") ?: "আয়"
+                    AddFormScreen(viewModel = viewModel, initialType = type) {
+                        navController.popBackStack()
+                    }
+                }
+                composable("due") { DueScreen(viewModel = viewModel) }
+                composable("budget") { BudgetScreen(viewModel = viewModel) }
+                composable("report") { ReportScreen(viewModel = viewModel) }
+                composable("notes") { NotesScreen(viewModel = viewModel) }
+                composable("settings") {
+                    SettingsScreen(
+                        viewModel = viewModel,
+                        prefs = prefs,
+                        onPrefsChange = onPrefsChange,
+                        onImportBackup = { uri ->
+                            importLauncher.launch("application/json")
+                        }
+                    )
+                }
+                composable("more") {
+                    MoreScreen(navController = navController)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MoreScreen(navController: NavHostController) {
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Text(text = tr("আরও", "More"), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(16.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
+                .clickable { navController.navigate("notes") },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(imageVector = Icons.Default.Note, contentDescription = null)
+            Text(text = " " + tr("নোট", "Notes"), fontSize = 16.sp)
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
+                .clickable { navController.navigate("settings") },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(imageVector = Icons.Default.Settings, contentDescription = null)
+            Text(text = " " + tr("সেটিংস", "Settings"), fontSize = 16.sp)
+        }
+    }
+}
+
+@Composable
+fun LockScreen(prefs: AppPrefs, onUnlocked: () -> Unit, activity: FragmentActivity) {
+    var pin by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(80.dp))
+        Text(text = "৳", fontSize = 48.sp, fontWeight = FontWeight.Bold, color = GreenDark)
+        Text(text = tr("আয় - ব্যয়", "Ay - Bay"), fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(32.dp))
+        Text(text = tr("পিন দিন", "Enter PIN"), fontSize = 16.sp)
+        Spacer(modifier = Modifier.height(12.dp))
+        OutlinedTextField(
+            value = pin,
+            onValueChange = { v -> pin = v.filter { it.isDigit() }.take(6) },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true
+        )
+        if (error) {
+            Text(text = tr("ভুল পিন", "Wrong PIN"), color = Color.Red, modifier = Modifier.padding(top = 8.dp))
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(
+            onClick = {
+                if (pin == prefs.pin) onUnlocked() else error = true
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
+        ) {
+            Text(text = tr("খুলুন", "Unlock"), fontSize = 16.sp)
+        }
+        if (prefs.biometricEnabled) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = {
+                    val executor = ContextCompat.getMainExecutor(activity)
+                    val prompt = BiometricPrompt(
+                        activity,
+                        executor,
+                        object : BiometricPrompt.AuthenticationCallback() {
+                            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                                onUnlocked()
+                            }
+                        }
+                    )
+                    val info = BiometricPrompt.PromptInfo.Builder()
+                        .setTitle(tr("আয় - ব্যয়", "Ay - Bay"))
+                        .setSubtitle(tr("ফিঙ্গারপ্রিন্ট দিন", "Use fingerprint"))
+                        .setNegativeButtonText(tr("বাতিল", "Cancel"))
+                        .build()
+                    prompt.authenticate(info)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
+            ) {
+                Icon(imageVector = Icons.Default.Fingerprint, contentDescription = null)
+                Text(text = " " + tr("ফিঙ্গারপ্রিন্ট", "Fingerprint"), fontSize = 16.sp)
+            }
+        }
+    }
+}

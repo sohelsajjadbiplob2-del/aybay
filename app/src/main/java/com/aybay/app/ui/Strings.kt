@@ -1,0 +1,42 @@
+package com.aybay.app.ui
+
+import android.content.Context
+
+// ভাষা: অ্যাপের সব UI লেখা tr() দিয়ে লেখা হয় — প্রথম আর্গুমেন্ট বাংলা,
+// দ্বিতীয়টা English। ভাষা শুধু বাংলা আর English; হিন্দি নেই।
+object LangState {
+    var isEnglish: Boolean = false
+}
+
+fun tr(bn: String, en: String): String = if (LangState.isEnglish) en else bn
+
+fun isEnglishPref(context: Context): Boolean =
+    context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE)
+        .getString("language", "bn") == "en"
+
+fun categoryLabel(category: String): String = when (category) {
+    "বাজার" -> tr("বাজার", "Groceries")
+    "খাবার" -> tr("খাবার", "Food")
+    "যাতায়াত" -> tr("যাতায়াত", "Transport")
+    "বিল" -> tr("বিল", "Bills")
+    "ধর্মীয় দান" -> tr("ধর্মীয় দান", "Donation")
+    "হাতখরচ" -> tr("হাতখরচ", "Pocket money")
+    "তেল/গ্যাস" -> tr("তেল/গ্যাস", "Fuel/Gas")
+    "মার্কেট/শপিং" -> tr("মার্কেট/শপিং", "Shopping")
+    "গাড়ি ভাড়া" -> tr("গাড়ি ভাড়া", "Vehicle rent")
+    "রেস্টুরেন্ট" -> tr("রেস্টুরেন্ট", "Restaurant")
+    "বাসা ভাড়া" -> tr("বাসা ভাড়া", "House rent")
+    "দোকান ভাড়া" -> tr("দোকান ভাড়া", "Shop rent")
+    "বেতন" -> tr("বেতন", "Salary")
+    "দৈনিক মজুরি" -> tr("দৈনিক মজুরি", "Daily wage")
+    "সাপ্তাহিক বেতন" -> tr("সাপ্তাহিক বেতন", "Weekly salary")
+    "মাসিক বেতন" -> tr("মাসিক বেতন", "Monthly salary")
+    else -> tr("অন্যান্য", "Others")
+}
+
+fun periodLabel(period: String): String = when (period) {
+    "সাপ্তাহিক" -> tr("সাপ্তাহিক", "Weekly")
+    "মাসিক" -> tr("মাসিক", "Monthly")
+    "বার্ষিক" -> tr("বার্ষিক", "Yearly")
+    else -> tr("দৈনিক", "Daily")
+}
