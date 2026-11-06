@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -99,7 +100,7 @@ fun HomeScreen(viewModel: AyBayViewModel, onAdd: (String) -> Unit, onOpenDue: ()
     val expenseDays = monthExpenseTx.map { it.date }.distinct().size
     val highestExpense = monthExpenseTx.maxOfOrNull { it.amount } ?: 0L
     val lowestExpense = monthExpenseTx.minOfOrNull { it.amount } ?: 0L
-    val avgExpense = if (expenseDays > 0) monthExpenseTotal / expenseDays else 0L
+    val avgExpense = if (expenseDays > 0) monthExpenseTotal / expenseDays.toLong() else 0L
 
     val pendingDue = dueItems.filter { !it.isPaid }
     val dueTotal = pendingDue.sumOf { it.amount }
