@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -39,21 +40,18 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, onSaved: () -> Unit) {
+fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: String = "", onSaved: () -> Unit) {
+    val context = LocalContext.current
     var type by remember { mutableStateOf(if (initialType == "ট্রান্সফার") "ব্যয়" else initialType) }
     var category by remember { mutableStateOf("") }
     var amountText by remember { mutableStateOf("") }
     var account by remember { mutableStateOf("হাতে নগদ") }
-    var note by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf(initialNote) }
     var payer by remember { mutableStateOf("") }
     var showAccountMenu by remember { mutableStateOf(false) }
     var saved by remember { mutableStateOf(false) }
     val accounts by viewModel.accounts.collectAsState()
-    val categories = when (type) {
-        "আয়" -> incomeCategories
-        "ব্যয়" -> expenseCategories
-        else -> listOf("সঞ্চয়", "অন্যান্য")
-    }
+    val categories = allCategories(context, type)
     val mainColor = when (type) {
         "আয়" -> GreenMain
         "ব্যয়" -> RedMain
