@@ -8,6 +8,8 @@ data class AppPrefs(
     val darkTheme: Boolean = false,
     val language: String = "bn",
     val pin: String = "",
+    val securityQuestion: String = "",
+    val securityAnswer: String = "",
     val biometricEnabled: Boolean = false,
     val appPinEnabled: Boolean = false,
     val lockedSections: Set<String> = emptySet(),
@@ -26,6 +28,8 @@ fun loadAppPrefs(context: Context): AppPrefs {
         darkTheme = prefs.getBoolean("dark_theme", false),
         language = prefs.getString("language", "bn") ?: "bn",
         pin = prefs.getString("pin", "") ?: "",
+        securityQuestion = prefs.getString("security_question", "") ?: "",
+        securityAnswer = prefs.getString("security_answer", "") ?: "",
         biometricEnabled = prefs.getBoolean("biometric_enabled", false),
         appPinEnabled = prefs.getBoolean("app_pin_enabled", false),
         lockedSections = (prefs.getString("locked_sections", "") ?: "")
@@ -45,6 +49,8 @@ fun saveAppPrefs(context: Context, prefs: AppPrefs) {
         .putBoolean("dark_theme", prefs.darkTheme)
         .putString("language", prefs.language)
         .putString("pin", prefs.pin)
+        .putString("security_question", prefs.securityQuestion)
+        .putString("security_answer", prefs.securityAnswer)
         .putBoolean("biometric_enabled", prefs.biometricEnabled)
         .putBoolean("app_pin_enabled", prefs.appPinEnabled)
         .putString("locked_sections", prefs.lockedSections.joinToString(","))
