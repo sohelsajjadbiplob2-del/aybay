@@ -38,3 +38,32 @@ fun saveAppPrefs(context: Context, prefs: AppPrefs) {
         .putInt("auto_salary_day", prefs.autoSalaryDay)
         .apply()
 }
+
+// হোমের সেকশন দেখানো/লুকানো (কার্ড সাজান): লুকানো সেকশনের key-গুলো সেভ থাকে।
+fun loadHiddenHomeSections(context: Context): Set<String> =
+    context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE)
+        .getStringSet("hidden_home_sections", emptySet()) ?: emptySet()
+
+fun saveHiddenHomeSections(context: Context, hidden: Set<String>) {
+    context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE).edit()
+        .putStringSet("hidden_home_sections", hidden).apply()
+}
+
+// নিজের যোগ করা খাত: ডিফল্ট খাতের সঙ্গে যোগ হয়, Add ফর্মেও দেখা যায়।
+fun loadCustomCategories(context: Context, type: String): Set<String> =
+    context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE)
+        .getStringSet("custom_categories_" + type, emptySet()) ?: emptySet()
+
+fun saveCustomCategories(context: Context, type: String, cats: Set<String>) {
+    context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE).edit()
+        .putStringSet("custom_categories_" + type, cats).apply()
+}
+
+fun allCategories(context: Context, type: String): List<String> {
+    val defaults = when (type) {
+        "আয়" -> incomeCategories
+        "ব্যয়" -> expenseCategories
+        else -> listOf("সঞ্চয়", "অন্যান্য")
+    }
+    return defaults + loadCustomCategories(context, type).filter { it !in defaults }
+}
