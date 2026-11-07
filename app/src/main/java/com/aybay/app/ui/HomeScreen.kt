@@ -1,28 +1,52 @@
 package com.aybay.app.ui
 
+import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -31,15 +55,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aybay.app.data.Totals
 import com.aybay.app.data.Transaction
 import java.time.LocalDate
+import java.time.YearMonth
 
 val incomeCategories = listOf("মাসিক বেতন", "দৈনিক মজুরি", "সাপ্তাহিক বেতন", "অন্যান্য")
 val expenseCategories = listOf(
@@ -47,6 +73,11 @@ val expenseCategories = listOf(
     "তেল/গ্যাস", "মার্কেট/শপিং", "গাড়ি ভাড়া", "রেস্টুরেন্ট",
     "বাসা ভাড়া", "দোকান ভাড়া", "অন্যান্য"
 )
+
+// হোম থেকে রিপোর্টে যাওয়ার সময় খোঁজার শব্দ পাঠানোর জায়গা।
+object HomeNavState {
+    var reportQuery: String = ""
+}
 
 private fun totalsOf(list: List<Transaction>): Totals {
     var income = 0L
@@ -62,116 +93,259 @@ private fun totalsOf(list: List<Transaction>): Totals {
     return Totals(income, expense, savings)
 }
 
+private fun filterByPeriod(list: List<Transaction>, period: String, today: LocalDate): List<Transaction> {
+    val todayKey = today.toString()
+    return when (period) {
+        "দৈনিক" -> list.filter { it.date == todayKey }
+        "সাপ্তাহিক" -> list.filter { it.date >= today.minusDays(6).toString() }
+        "বার্ষিক" -> list.filter { it.date.startsWith(todayKey.substring(0, 4)) }
+        else -> list.filter { it.date.startsWith(todayKey.substring(0, 7)) }
+    }
+}
+
+private fun groupByCategory(list: List<Transaction>, type: String): Map<String, Long> {
+    val map = linkedMapOf<String, Long>()
+    for (t in list) {
+        if (t.type == type) {
+            map[t.category] = (map[t.category] ?: 0L) + t.amount
+        }
+    }
+    return map.entries.sortedByDescending { it.value }.associate { it.key to it.value }
+}
+
 private fun percentOf(part: Long, total: Long): String {
     if (total <= 0L) return "০%"
     return toBengaliDigits((part * 100 / total).toString()) + "%"
 }
 
+private fun categoryIcon(category: String): String = when (category) {
+    "বাজার" -> "🛒"
+    "বিল" -> "🧾"
+    "খাবার" -> "🍲"
+    "যাতায়াত" -> "🚌"
+    "ধর্মীয় দান" -> "🤲"
+    "হাতখরচ" -> "💵"
+    "তেল/গ্যাস" -> "⛽"
+    "মার্কেট/শপিং" -> "🛍️"
+    "গাড়ি ভাড়া" -> "🚗"
+    "রেস্টুরেন্ট" -> "🍽️"
+    "বাসা ভাড়া" -> "🏠"
+    "দোকান ভাড়া" -> "🏪"
+    "বেতন", "মাসিক বেতন", "সাপ্তাহিক বেতন" -> "💼"
+    "দৈনিক মজুরি" -> "👷"
+    "সঞ্চয়" -> "🏺"
+    else -> "🏷️"
+}
+
+private fun accountKindLabel(kind: String): String = when (kind) {
+    "ক্যাশ" -> tr("হাতে থাকা টাকা", "Cash in hand")
+    "ব্যাংক" -> tr("ব্যাংক", "Bank")
+    "মোবাইল" -> tr("মোবাইল", "Mobile")
+    else -> kind
+}
+
 @Composable
-fun HomeScreen(viewModel: AyBayViewModel, onAdd: (String) -> Unit, onOpenDue: () -> Unit) {
+fun HomeScreen(
+    viewModel: AyBayViewModel,
+    onAdd: (String) -> Unit,
+    onOpenDue: () -> Unit,
+    onOpenBudget: () -> Unit,
+    onOpenReport: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    val context = LocalContext.current
     val transactions by viewModel.transactions.collectAsState()
     val dueItems by viewModel.dueItems.collectAsState()
-    var period by remember { mutableStateOf("মাসিক") }
+    val accounts by viewModel.accounts.collectAsState()
+    val totalsAll by viewModel.totalsAll.collectAsState()
     val today = LocalDate.now()
     val todayKey = today.toString()
     val monthKey = todayKey.substring(0, 7)
-    val yearKey = todayKey.substring(0, 4)
-    val weekStart = today.minusDays(6).toString()
-    val monthTotals by viewModel.totalsOfMonth(monthKey).collectAsState(initial = Totals())
-    val expenseByCat by viewModel.categoryTotals(monthKey, "ব্যয়").collectAsState(initial = emptyMap())
+    val expenseByCatMonth by viewModel.categoryTotals(monthKey, "ব্যয়").collectAsState(initial = emptyMap())
+    val budgets by viewModel.budgetsOfMonth(monthKey).collectAsState(initial = emptyList())
 
-    // সময়ের ট্যাব আসল ডাটা দিয়েই হিসাব হয়: দৈনিক=আজ, সাপ্তাহিক=শেষ ৭ দিন,
-    // মাসিক=এই মাস, বার্ষিক=এই বছর।
-    val shown = when (period) {
-        "দৈনিক" -> totalsOf(transactions.filter { it.date == todayKey })
-        "সাপ্তাহিক" -> totalsOf(transactions.filter { it.date >= weekStart })
-        "বার্ষিক" -> totalsOf(transactions.filter { it.date.startsWith(yearKey) })
-        else -> monthTotals
-    }
+    var period by remember { mutableStateOf("মাসিক") }
+    val shown = totalsOf(filterByPeriod(transactions, period, today))
     val shownTotal = shown.income + shown.expense + shown.savings
+    val todayTotals = totalsOf(transactions.filter { it.date == todayKey })
+    val weekTotals = totalsOf(transactions.filter { it.date >= today.minusDays(6).toString() })
 
-    // আজকের হিসাব (আসল লেনদেন থেকে)।
-    val todayTx = transactions.filter { it.date == todayKey }
-    val todayTotals = totalsOf(todayTx)
+    // মোট কার্ডের তালা আর ড্রপডাউন (কোন কার্ড লক/খোলা আছে)।
+    var lockedCards by remember { mutableStateOf(setOf<String>()) }
+    var expandedCards by remember { mutableStateOf(setOf<String>()) }
 
-    // এই মাসের ব্যয়ের পরিসংখ্যান (আসল লেনদেন থেকে)।
-    val monthExpenseTx = transactions.filter { it.date.startsWith(monthKey) && it.type == "ব্যয়" }
-    val monthExpenseTotal = monthExpenseTx.sumOf { it.amount }
-    val expenseDays = monthExpenseTx.map { it.date }.distinct().size
-    val highestExpense = monthExpenseTx.maxOfOrNull { it.amount } ?: 0L
-    val lowestExpense = monthExpenseTx.minOfOrNull { it.amount } ?: 0L
-    val avgExpense = if (expenseDays > 0) monthExpenseTotal / expenseDays.toLong() else 0L
+    // কার্ড সাজান: লুকানো সেকশন ফোনে সেভ থাকে।
+    var hiddenSections by remember { mutableStateOf(loadHiddenHomeSections(context)) }
+    var showArrange by remember { mutableStateOf(false) }
+    fun isVisible(key: String) = key !in hiddenSections
+    val sectionOptions = listOf(
+        "chart" to tr("মাসিক আয়-ব্যয়ের চার্ট", "Monthly income-expense chart"),
+        "flow" to tr("মাসিক ব্যয়ের ফ্লো চার্ট", "Monthly expense flow chart"),
+        "category" to tr("খাত অনুযায়ী বিশ্লেষণ", "Category analysis"),
+        "due" to tr("বাকি ও ধার", "Due & Loan"),
+        "ledger" to tr("নাম অনুযায়ী খাতা", "Name ledger"),
+        "budget" to tr("মাসিক বাজেট", "Monthly budget"),
+        "accounts" to tr("অ্যাকাউন্ট ব্যালেন্স", "Account balance"),
+        "recent" to tr("সাম্প্রতিক লেনদেন", "Recent transactions")
+    )
 
+    // মাসিক চার্ট: দৈনিক/মাসিক টগল।
+    var chartMode by remember { mutableStateOf("মাসিক") }
+    val chartTx = if (chartMode == "দৈনিক") {
+        transactions.filter { it.date == todayKey }
+    } else {
+        transactions.filter { it.date.startsWith(monthKey) }
+    }
+    val chartTotals = totalsOf(chartTx)
+    val chartIncomeCount = chartTx.count { it.type == "আয়" }
+    val chartExpenseCount = chartTx.count { it.type == "ব্যয়" }
+
+    // ফ্লো চার্ট: মাস বদলানো যায়, দিনে ট্যাপ করলে ওই দিনের ব্যয় দেখায়।
+    var flowMonth by remember { mutableStateOf(monthKey) }
+    var selectedDay by remember { mutableStateOf(today.dayOfMonth) }
+    val flowYm = YearMonth.parse(flowMonth)
+    val flowDays = flowYm.lengthOfMonth()
+    val flowDaily = List(flowDays) { d ->
+        val key = flowMonth + "-" + (d + 1).toString().padStart(2, '0')
+        transactions.filter { it.date == key && it.type == "ব্যয়" }.sumOf { it.amount }
+    }
+    val flowTotal = flowDaily.sum()
+    val flowExpenseDays = flowDaily.count { it > 0L }
+    val flowMax = flowDaily.maxOrNull() ?: 0L
+    val flowMaxDay = if (flowMax > 0L) flowDaily.indexOf(flowMax) + 1 else 0
+    val flowMin = flowDaily.filter { it > 0L }.minOrNull() ?: 0L
+    val flowMinDay = if (flowMin > 0L) flowDaily.indexOf(flowMin) + 1 else 0
+    val daysElapsed = if (flowMonth == monthKey) today.dayOfMonth else flowDays
+    val flowAvg = if (daysElapsed > 0) flowTotal / daysElapsed.toLong() else 0L
+    val selDay = selectedDay.coerceIn(1, flowDays)
+    val selValue = flowDaily[selDay - 1]
+    val selDate = flowYm.atDay(selDay).toString()
+
+    // বাকি ও ধার: আসল Due ডেটা থেকে তিনটা বাক্স।
     val pendingDue = dueItems.filter { !it.isPaid }
-    val dueTotal = pendingDue.sumOf { it.amount }
+    val dueTotal = pendingDue.filter { it.kind == "বাকি" }.sumOf { it.amount }
+    val borrowed = pendingDue.filter { it.kind == "ধার" && it.direction == "নিয়েছি" }.sumOf { it.amount }
+    val lent = pendingDue.filter { it.kind == "ধার" && it.direction == "দিয়েছি" }.sumOf { it.amount }
 
-    LazyColumn(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    // নাম অনুযায়ী খাতা।
+    var ledgerType by remember { mutableStateOf("আয়") }
+    var fromDate by remember { mutableStateOf<LocalDate?>(null) }
+    var toDate by remember { mutableStateOf<LocalDate?>(null) }
+    var ledgerQuery by remember { mutableStateOf("") }
+    val ledgerList = transactions.filter {
+        it.type == ledgerType &&
+            (fromDate == null || it.date >= fromDate.toString()) &&
+            (toDate == null || it.date <= toDate.toString())
+    }
+    val ledgerGroups = ledgerList.groupBy { it.payer.ifBlank { it.category } }
+        .mapValues { entry -> entry.value.sumOf { it.amount } }
+        .entries.sortedByDescending { it.value }
+    val ledgerShown = if (ledgerQuery.isBlank()) {
+        ledgerGroups
+    } else {
+        ledgerGroups.filter { it.key.contains(ledgerQuery, ignoreCase = true) }
+    }
+    val ledgerTotal = ledgerShown.sumOf { it.value }
+    val ledgerMax = ledgerShown.maxOfOrNull { it.value } ?: 0L
+    val ledgerMaxName = ledgerShown.maxByOrNull { it.value }?.key ?: ""
+
+    // খাত সম্পাদন ডায়ালগ।
+    var editCatType by remember { mutableStateOf<String?>(null) }
+    var customCats by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var newCatText by remember { mutableStateOf("") }
+
+    fun pickDate(initial: LocalDate, onPick: (LocalDate) -> Unit) {
+        DatePickerDialog(
+            context,
+            { _, y, m, d -> onPick(LocalDate.of(y, m + 1, d)) },
+            initial.year, initial.monthValue - 1, initial.dayOfMonth
+        ).show()
+    }
+
+    // অ্যাকাউন্ট ব্যালেন্স: লেনদেন থেকে হিসাব।
+    val accountBalances = accounts.map { acc ->
+        acc to (acc.balance + transactions.filter { it.account == acc.name }.sumOf {
+            when (it.type) {
+                "আয়" -> it.amount
+                "ব্যয়", "সঞ্চয়" -> -it.amount
+                else -> 0L
+            }
+        })
+    }
+    val totalBalance = if (accountBalances.isEmpty()) {
+        totalsAll.balance
+    } else {
+        accountBalances.sumOf { it.second }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxWidth().background(PageBg).padding(horizontal = 12.dp)
+    ) {
         item {
-            // ব্যালেন্স কার্ড — গ্র্যাডিয়েন্ট হিরো কার্ড
+            // ব্যালেন্স কার্ড — হালকা নীল
             Card(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                colors = CardDefaults.cardColors(containerColor = LightBlueCard),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Brush.horizontalGradient(listOf(GreenDark, GreenMain)))
-                        .padding(16.dp)
-                ) {
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = tr("বর্তমান মোট নগদ", "Current Cash"),
-                                    fontSize = 14.sp,
-                                    color = Color(0xFFD1FAE5)
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.AccountBalanceWallet,
+                                    contentDescription = null,
+                                    tint = JomaBlue,
+                                    modifier = Modifier.size(20.dp)
                                 )
                                 Text(
-                                    text = moneyText(shown.balance),
-                                    fontSize = 32.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = if (viewModel.sync.isAvailable) tr("লাইভ সিঙ্ক চালু", "Live Sync On") else tr("অফলাইন", "Offline"),
-                                    fontSize = 12.sp,
-                                    color = Color.White,
-                                    modifier = Modifier
-                                        .padding(top = 8.dp)
-                                        .background(Color.White.copy(alpha = 0.22f), RoundedCornerShape(20.dp))
-                                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                                    text = tr("বর্তমান হাতে নগদ", "Current Cash in Hand"),
+                                    modifier = Modifier.padding(start = 6.dp),
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
-                            DonutChart(
-                                shown.income,
-                                shown.expense,
-                                shown.savings,
-                                centerTop = moneyText(shown.balance),
-                                centerBottom = tr("ব্যালেন্স", "Balance")
+                            Text(
+                                text = moneyText(totalsAll.balance),
+                                modifier = Modifier.padding(top = 6.dp),
+                                fontSize = 30.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        LegendRow(
-                            GreenTint, tr("আয়", "Income"), moneyText(shown.income),
-                            percentOf(shown.income, shownTotal), Color.White
+                        ExpenseShareDonut(shown.expense, shownTotal)
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier
+                            .background(Color.White, RoundedCornerShape(20.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier.size(8.dp)
+                                .background(
+                                    if (viewModel.sync.isAvailable) GreenMain else GreyText,
+                                    CircleShape
+                                )
                         )
-                        LegendRow(
-                            RedMain, tr("ব্যয়", "Expense"), moneyText(shown.expense),
-                            percentOf(shown.expense, shownTotal), Color.White
-                        )
-                        LegendRow(
-                            BlueTint, tr("সঞ্চয়", "Savings"), moneyText(shown.savings),
-                            percentOf(shown.savings, shownTotal), Color.White
+                        Text(
+                            text = if (viewModel.sync.isAvailable) {
+                                tr("লাইভ সিঙ্ক চালু", "Live Sync On")
+                            } else {
+                                tr("অফলাইন", "Offline")
+                            },
+                            modifier = Modifier.padding(start = 8.dp),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
             }
-            // সময়ের ট্যাব
+            // সময়ের ট্যাব — সিলেক্টেড নীল
             Card(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 shape = RoundedCornerShape(16.dp),
@@ -188,7 +362,7 @@ fun HomeScreen(viewModel: AyBayViewModel, onAdd: (String) -> Unit, onOpenDue: ()
                             modifier = Modifier
                                 .weight(1f)
                                 .background(
-                                    if (selected) GreenDark else Color.Transparent,
+                                    if (selected) JomaBlue else Color.Transparent,
                                     RoundedCornerShape(12.dp)
                                 )
                                 .clickable { period = p }
@@ -205,182 +379,1146 @@ fun HomeScreen(viewModel: AyBayViewModel, onAdd: (String) -> Unit, onOpenDue: ()
                     }
                 }
             }
-            // মোট কার্ড
+            // মোট কার্ড — তালা আর ড্রপডাউন সহ
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                TotalCard(tr("মোট আয়", "Total Income"), moneyText(shown.income), GreenMain, Modifier.weight(1f), GreenTint)
-                TotalCard(tr("মোট ব্যয়", "Total Expense"), moneyText(shown.expense), RedMain, Modifier.weight(1f), RedTint)
-                TotalCard(tr("নীট সঞ্চয়", "Net Savings"), moneyText(shown.netSavings), BlueMain, Modifier.weight(1f), BlueTint)
+                JomaTotalCard(
+                    title = tr("মোট আয়", "Total Income"),
+                    amount = moneyText(shown.income),
+                    icon = Icons.Default.ArrowDownward,
+                    color = GreenMain,
+                    bgColor = GreenTint,
+                    locked = "আয়" in lockedCards,
+                    onLockClick = {
+                        lockedCards = if ("আয়" in lockedCards) lockedCards - "আয়" else lockedCards + "আয়"
+                    },
+                    expanded = "আয়" in expandedCards,
+                    onExpandClick = {
+                        expandedCards = if ("আয়" in expandedCards) expandedCards - "আয়" else expandedCards + "আয়"
+                    },
+                    todayAmount = moneyText(todayTotals.income),
+                    weekAmount = moneyText(weekTotals.income),
+                    modifier = Modifier.weight(1f)
+                )
+                JomaTotalCard(
+                    title = tr("মোট ব্যয়", "Total Expense"),
+                    amount = moneyText(shown.expense),
+                    icon = Icons.Default.ArrowUpward,
+                    color = RedMain,
+                    bgColor = RedTint,
+                    locked = "ব্যয়" in lockedCards,
+                    onLockClick = {
+                        lockedCards = if ("ব্যয়" in lockedCards) lockedCards - "ব্যয়" else lockedCards + "ব্যয়"
+                    },
+                    expanded = "ব্যয়" in expandedCards,
+                    onExpandClick = {
+                        expandedCards = if ("ব্যয়" in expandedCards) expandedCards - "ব্যয়" else expandedCards + "ব্যয়"
+                    },
+                    todayAmount = moneyText(todayTotals.expense),
+                    weekAmount = moneyText(weekTotals.expense),
+                    modifier = Modifier.weight(1f)
+                )
+                JomaTotalCard(
+                    title = tr("নীট সঞ্চয়", "Net Savings"),
+                    amount = moneyText(shown.netSavings),
+                    icon = Icons.Default.Savings,
+                    color = OrangeMain,
+                    bgColor = YellowTint,
+                    locked = "সঞ্চয়" in lockedCards,
+                    onLockClick = {
+                        lockedCards = if ("সঞ্চয়" in lockedCards) lockedCards - "সঞ্চয়" else lockedCards + "সঞ্চয়"
+                    },
+                    expanded = "সঞ্চয়" in expandedCards,
+                    onExpandClick = {
+                        expandedCards = if ("সঞ্চয়" in expandedCards) expandedCards - "সঞ্চয়" else expandedCards + "সঞ্চয়"
+                    },
+                    todayAmount = moneyText(todayTotals.netSavings),
+                    weekAmount = moneyText(weekTotals.netSavings),
+                    modifier = Modifier.weight(1f)
+                )
             }
-            // আজকের হিসাব
-            SectionTitle(tr("আজকের হিসাব", "Today's Summary"))
+            // দ্রুত যোগ করুন + কার্ড সাজান
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    StatBox(tr("আজকের আয়", "Today's Income"), moneyText(todayTotals.income), GreenTint, GreenMain, Modifier.weight(1f))
-                    StatBox(tr("আজকের ব্যয়", "Today's Expense"), moneyText(todayTotals.expense), RedTint, RedMain, Modifier.weight(1f))
-                    StatBox(tr("আজকের উদ্বৃত্ত", "Today's Balance"), moneyText(todayTotals.balance), BlueTint, BlueMain, Modifier.weight(1f))
-                }
-            }
-            // দ্রুত যোগ করুন
-            SectionTitle(tr("দ্রুত যোগ করুন", "Quick Add"))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                QuickAddButton(Icons.Default.ArrowUpward, tr("আয়", "Income"), GreenMain, GreenTint, Modifier.weight(1f)) { onAdd("আয়") }
-                QuickAddButton(Icons.Default.ArrowDownward, tr("ব্যয়", "Expense"), RedMain, RedTint, Modifier.weight(1f)) { onAdd("ব্যয়") }
-                QuickAddButton(Icons.Default.Savings, tr("সঞ্চয়", "Savings"), BlueMain, BlueTint, Modifier.weight(1f)) { onAdd("সঞ্চয়") }
-                QuickAddButton(Icons.Default.SwapHoriz, tr("ট্রান্সফার", "Transfer"), GreenDark, GreenLight, Modifier.weight(1f)) { onAdd("ট্রান্সফার") }
-            }
-            // মাসিক ব্যয়ের চার্ট
-            SectionTitle(tr("মাসিক ব্যয়ের চার্ট", "Monthly Expense Chart"))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+                Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(10.dp).background(OrangeMain, CircleShape))
+                        Text(
+                            text = "⚡ " + tr("দ্রুত যোগ করুন", "Quick Add"),
+                            modifier = Modifier.weight(1f).padding(start = 8.dp),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Row(
+                            modifier = Modifier
+                                .background(LightBlueCard, RoundedCornerShape(16.dp))
+                                .clickable { showArrange = !showArrange }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SwapHoriz,
+                                contentDescription = null,
+                                tint = JomaBlue,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = tr("কার্ড সাজান", "Arrange Cards"),
+                                modifier = Modifier.padding(start = 4.dp),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = JomaBlue
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        StatBox(tr("সর্বোচ্চ ব্যয়", "Highest Expense"), moneyText(highestExpense), RedTint, RedMain, Modifier.weight(1f))
-                        StatBox(tr("সর্বনিম্ন ব্যয়", "Lowest Expense"), moneyText(lowestExpense), GreenTint, GreenMain, Modifier.weight(1f))
-                        StatBox(tr("দৈনিক গড়", "Daily Avg"), moneyText(avgExpense), BlueTint, BlueMain, Modifier.weight(1f))
+                        QuickAddTile(Icons.Default.Add, tr("আয়", "Income"), GreenMain, GreenTint, Modifier.weight(1f)) { onAdd("আয়") }
+                        QuickAddTile(Icons.Default.Remove, tr("ব্যয়", "Expense"), RedMain, RedTint, Modifier.weight(1f)) { onAdd("ব্যয়") }
+                        QuickAddTile(Icons.Default.Savings, tr("সঞ্চয়", "Savings"), OrangeMain, YellowTint, Modifier.weight(1f)) { onAdd("সঞ্চয়") }
+                        QuickAddTile(Icons.Default.SwapHoriz, tr("ট্রান্সফার", "Transfer"), PurpleMain, PurpleTint, Modifier.weight(1f)) { onAdd("ট্রান্সফার") }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    if (expenseByCat.isEmpty()) {
-                        EmptyState("📊", tr("এখনো কোনো ব্যয় যোগ করা হয়নি", "No expense added yet"))
-                    } else {
-                        BarChart(expenseByCat.entries.map { it.key to it.value }, RedMain)
-                    }
-                }
-            }
-            // খাত অনুযায়ী বিশ্লেষণ
-            SectionTitle(tr("ব্যয়ের খাত অনুযায়ী বিশ্লেষণ", "Expense by Category"))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    if (expenseByCat.isEmpty()) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            MultiDonutChart(
-                                emptyList(),
-                                tr("মোট ব্যয়", "Total Expense"),
-                                moneyText(0L)
-                            )
-                            EmptyState("📊", tr("এখনো কোনো ব্যয় যোগ করা হয়নি", "No expense added yet"))
-                        }
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            val catItems = expenseByCat.entries.mapIndexed { index, entry ->
-                                CategoryColors[index % CategoryColors.size] to entry.value
-                            }
-                            MultiDonutChart(
-                                catItems,
-                                tr("মোট ব্যয়", "Total Expense"),
-                                moneyText(monthExpenseTotal)
-                            )
-                            Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                                expenseByCat.entries.forEachIndexed { index, entry ->
-                                    val color = CategoryColors[index % CategoryColors.size]
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(10.dp)
-                                                .background(color, RoundedCornerShape(5.dp))
-                                        )
-                                        Text(
-                                            text = categoryLabel(entry.key),
-                                            modifier = Modifier.weight(1f).padding(start = 8.dp),
-                                            fontSize = 14.sp
-                                        )
-                                        Text(
-                                            text = moneyText(entry.value) + " · " + percentOf(entry.value, monthExpenseTotal),
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
+                    if (showArrange) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        for ((key, label) in sectionOptions) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    val next = if (key in hiddenSections) hiddenSections - key else hiddenSections + key
+                                    saveHiddenHomeSections(context, next)
+                                    hiddenSections = next
+                                },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = key !in hiddenSections,
+                                    onCheckedChange = {
+                                        val next = if (key in hiddenSections) hiddenSections - key else hiddenSections + key
+                                        saveHiddenHomeSections(context, next)
+                                        hiddenSections = next
                                     }
-                                }
+                                )
+                                Text(text = label, fontSize = 14.sp)
                             }
                         }
                     }
                 }
             }
-            // বাকি ও ধার — খালি থাকলেও দেখায়
-            SectionTitle(tr("বাকি ও ধার", "Due & Loan"))
-            Card(
-                modifier = Modifier.fillMaxWidth().clickable { onOpenDue() },
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = tr("মোট বাকি", "Total Due"),
-                        modifier = Modifier.weight(1f),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = moneyText(dueTotal),
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (dueTotal > 0L) RedMain else GreenMain
-                    )
-                    Text(
-                        text = "›",
-                        modifier = Modifier.padding(start = 10.dp),
-                        fontSize = 20.sp,
-                        color = GreyText
-                    )
-                }
-            }
-            // সাম্প্রতিক লেনদেন
-            SectionTitle(tr("সাম্প্রতিক লেনদেন", "Recent Transactions"))
-        }
-        if (transactions.isEmpty()) {
-            item {
+            // মাসিক আয়-ব্যয়ের চার্ট
+            if (isVisible("chart")) {
+                JomaSectionHeader(JomaBlue, tr("মাসিক আয়-ব্যয়ের চার্ট", "Monthly Income-Expense Chart"))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
-                    EmptyState("🧾", tr("এখনো কোনো লেনদেন যোগ করা হয়নি", "No transactions added yet"))
+                    Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Spacer(modifier = Modifier.weight(1f))
+                            Box(
+                                modifier = Modifier
+                                    .background(LightBlueCard, RoundedCornerShape(16.dp))
+                                    .clickable { onOpenSettings() }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = tr("অটো সেট", "Auto Set"),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = JomaBlue
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .background(GreyBg, RoundedCornerShape(16.dp))
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarToday,
+                                    contentDescription = null,
+                                    tint = GreyText,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = monthLabel(monthKey),
+                                    modifier = Modifier.padding(start = 4.dp),
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(GreyBg, RoundedCornerShape(12.dp))
+                                .padding(4.dp)
+                        ) {
+                            for (m in listOf("দৈনিক", "মাসিক")) {
+                                val selected = chartMode == m
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(
+                                            if (selected) JomaBlue else Color.Transparent,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable { chartMode = m }
+                                        .padding(vertical = 9.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = tr(
+                                            m + " চার্ট",
+                                            if (m == "দৈনিক") "Daily Chart" else "Monthly Chart"
+                                        ),
+                                        color = if (selected) Color.White else Color.Black,
+                                        fontSize = 14.sp,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                IncomeExpenseBars(chartTotals.income, chartTotals.expense)
+                            }
+                            Column(
+                                modifier = Modifier.weight(1f).padding(start = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val prefix = if (chartMode == "দৈনিক") {
+                                    tr("আজকের", "Today's")
+                                } else {
+                                    tr("মাসিক", "Monthly")
+                                }
+                                ChartTotalBox(prefix + " " + tr("আয়", "Income"), moneyText(chartTotals.income), GreenTint, GreenMain)
+                                ChartTotalBox(prefix + " " + tr("ব্যয়", "Expense"), moneyText(chartTotals.expense), RedTint, RedMain)
+                                ChartTotalBox(prefix + " " + tr("উদ্বৃত্ত", "Balance"), moneyText(chartTotals.balance), YellowTint, OrangeMain)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        SplitProgressBar(chartTotals.income, chartTotals.expense)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = tr("আয়ের লেনদেন", "Income transactions") + ": " + toBengaliDigits(chartIncomeCount.toString()),
+                                fontSize = 12.sp,
+                                color = GreyText
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            Text(
+                                text = tr("ব্যয়ের লেনদেন", "Expense transactions") + ": " + toBengaliDigits(chartExpenseCount.toString()),
+                                fontSize = 12.sp,
+                                color = GreyText
+                            )
+                        }
+                    }
                 }
             }
-        } else {
-            items(transactions.take(20)) { item ->
-                TransactionRow(item, onDelete = { viewModel.deleteTransaction(item) })
+            // মাসিক ব্যয়ের ফ্লো চার্ট
+            if (isVisible("flow")) {
+                JomaSectionHeader(GreenMain, tr("মাসিক ব্যয়ের ফ্লো চার্ট", "Monthly Expense Flow Chart"))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    flowMonth = YearMonth.parse(flowMonth).minusMonths(1).toString()
+                                    selectedDay = 1
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.ChevronLeft, contentDescription = null)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .background(GreyBg, RoundedCornerShape(16.dp))
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = monthLabel(flowMonth) + " (" + toBengaliDigits("1") + "–" + toBengaliDigits(flowDays.toString()) + ")",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    val next = YearMonth.parse(flowMonth).plusMonths(1).toString()
+                                    if (next <= monthKey) {
+                                        flowMonth = next
+                                        selectedDay = 1
+                                    }
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FlowStatBox(
+                                tr("সর্বোচ্চ ব্যয়", "Highest Expense"),
+                                if (flowMax > 0L) {
+                                    toBengaliDigits(flowMaxDay.toString()) + " " + tr("তারিখ", "th") + " • " + moneyText(flowMax)
+                                } else {
+                                    moneyText(0L)
+                                },
+                                RedTint, RedMain, Modifier.weight(1f)
+                            )
+                            FlowStatBox(
+                                tr("সর্বনিম্ন ব্যয়", "Lowest Expense"),
+                                if (flowMin > 0L) {
+                                    toBengaliDigits(flowMinDay.toString()) + " " + tr("তারিখ", "th") + " • " + moneyText(flowMin)
+                                } else {
+                                    moneyText(0L)
+                                },
+                                GreenTint, GreenMain, Modifier.weight(1f)
+                            )
+                            FlowStatBox(
+                                tr("দৈনিক গড়", "Daily Avg"),
+                                moneyText(flowAvg),
+                                GreyBg, Color.Black, Modifier.weight(1f)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White, RoundedCornerShape(14.dp))
+                                .padding(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .background(GreenTint, RoundedCornerShape(12.dp))
+                                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarToday,
+                                        contentDescription = null,
+                                        tint = GreenMain,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = fullDateLabel(selDate),
+                                        modifier = Modifier.padding(start = 4.dp),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = GreenMain
+                                    )
+                                }
+                                Spacer(modifier = Modifier.weight(1f))
+                                Text(
+                                    text = if (selValue > 0L) {
+                                        moneyText(selValue)
+                                    } else {
+                                        tr("ব্যয় নেই", "No expense") + " " + moneyText(0L)
+                                    },
+                                    fontSize = 13.sp,
+                                    color = GreyText
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            FlowLineChart(
+                                days = flowDays,
+                                values = flowDaily,
+                                selectedDay = selDay,
+                                onSelectDay = { selectedDay = it }
+                            )
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                val labels = listOf(1, 5, 10, 15, 20, 25, 30)
+                                for ((i, d) in labels.withIndex()) {
+                                    Text(
+                                        text = if (d <= flowDays) toBengaliDigits(d.toString()) else "",
+                                        modifier = Modifier.weight(1f),
+                                        fontSize = 12.sp,
+                                        color = GreyText,
+                                        textAlign = when (i) {
+                                            0 -> TextAlign.Start
+                                            labels.size - 1 -> TextAlign.End
+                                            else -> TextAlign.Center
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Text(
+                                text = tr("মোট ব্যয়ের দিন", "Expense days") + ": " +
+                                    toBengaliDigits(flowExpenseDays.toString()) + "/" +
+                                    toBengaliDigits(flowDays.toString()),
+                                fontSize = 12.sp,
+                                color = GreyText
+                            )
+                        }
+                    }
+                }
+            }
+            // খাত অনুযায়ী বিশ্লেষণ — ৩টা আলাদা কার্ড
+            if (isVisible("category")) {
+                CategoryAnalysisCard(
+                    type = "ব্যয়",
+                    color = RedMain,
+                    transactions = transactions,
+                    today = today,
+                    onEditCategories = { t ->
+                        customCats = loadCustomCategories(context, t)
+                        newCatText = ""
+                        editCatType = t
+                    },
+                    onSeeAll = onOpenReport
+                )
+                CategoryAnalysisCard(
+                    type = "আয়",
+                    color = GreenMain,
+                    transactions = transactions,
+                    today = today,
+                    onEditCategories = { t ->
+                        customCats = loadCustomCategories(context, t)
+                        newCatText = ""
+                        editCatType = t
+                    },
+                    onSeeAll = onOpenReport
+                )
+                CategoryAnalysisCard(
+                    type = "সঞ্চয়",
+                    color = OrangeMain,
+                    transactions = transactions,
+                    today = today,
+                    onEditCategories = { t ->
+                        customCats = loadCustomCategories(context, t)
+                        newCatText = ""
+                        editCatType = t
+                    },
+                    onSeeAll = onOpenReport
+                )
+            }
+            // বাকি ও ধার (Cash)
+            if (isVisible("due")) {
+                JomaSectionHeader(
+                    JomaBlue,
+                    tr("বাকি ও ধার (Cash)", "Due & Loan (Cash)"),
+                    trailing = {
+                        Text(
+                            text = tr("বিস্তারিত দেখুন ›", "See details ›"),
+                            modifier = Modifier.clickable { onOpenDue() },
+                            fontSize = 13.sp,
+                            color = GreyText
+                        )
+                    }
+                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        DueBox(tr("মোট বাকি", "Total Due"), moneyText(dueTotal), YellowTint, "🛒", Modifier.weight(1f)) { onOpenDue() }
+                        DueBox(tr("ধার নেওয়া (Cash)", "Borrowed (Cash)"), moneyText(borrowed), RedTint, "🔴", Modifier.weight(1f)) { onOpenDue() }
+                        DueBox(tr("ধার দেওয়া (Cash)", "Lent (Cash)"), moneyText(lent), GreenTint, "🟢", Modifier.weight(1f)) { onOpenDue() }
+                    }
+                }
+            }
+            // নাম অনুযায়ী খাতা
+            if (isVisible("ledger")) {
+                JomaSectionHeader(JomaBlue, tr("নাম অনুযায়ী খাতা", "Ledger by Name"))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CalendarToday,
+                                contentDescription = null,
+                                tint = GreyText,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Row(
+                                modifier = Modifier.weight(1f).padding(start = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(GreyBg, RoundedCornerShape(12.dp))
+                                        .clickable { pickDate(fromDate ?: today) { fromDate = it } }
+                                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = fromDate?.let { fullDateLabel(it.toString()) }
+                                            ?: tr("শুরু থেকে", "From start"),
+                                        fontSize = 13.sp,
+                                        color = GreyText
+                                    )
+                                }
+                                Text(text = "—", fontSize = 14.sp, color = GreyText)
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(GreyBg, RoundedCornerShape(12.dp))
+                                        .clickable { pickDate(toDate ?: today) { toDate = it } }
+                                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = toDate?.let { fullDateLabel(it.toString()) }
+                                            ?: tr("বর্তমান পর্যন্ত", "Until now"),
+                                        fontSize = 13.sp,
+                                        color = GreyText
+                                    )
+                                }
+                            }
+                            IconButton(
+                                onClick = { fromDate = null; toDate = null },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = null,
+                                    tint = GreyText,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            for (t in listOf("আয়", "ব্যয়", "সঞ্চয়")) {
+                                val selected = ledgerType == t
+                                val tColor = when (t) {
+                                    "আয়" -> GreenMain
+                                    "ব্যয়" -> RedMain
+                                    else -> YellowMain
+                                }
+                                val tBg = when (t) {
+                                    "আয়" -> GreenTint
+                                    "ব্যয়" -> RedTint
+                                    else -> YellowTint
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(
+                                            if (selected) tColor else tBg,
+                                            RoundedCornerShape(14.dp)
+                                        )
+                                        .clickable { ledgerType = t }
+                                        .padding(vertical = 12.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (selected) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        Text(
+                                            text = tr(
+                                                t,
+                                                if (t == "আয়") "Income" else if (t == "ব্যয়") "Expense" else "Savings"
+                                            ),
+                                            modifier = Modifier.padding(
+                                                start = if (selected) 4.dp else 0.dp
+                                            ),
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (selected) Color.White else Color.Black
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val totalName = when (ledgerType) {
+                                "আয়" -> tr("মোট আয়", "Total Income")
+                                "ব্যয়" -> tr("মোট ব্যয়", "Total Expense")
+                                else -> tr("মোট সঞ্চয়", "Total Savings")
+                            }
+                            LedgerStatBox(
+                                totalName, moneyText(ledgerTotal), Modifier.weight(1f)
+                            )
+                            LedgerStatBox(
+                                tr("লেনদেন", "Transactions"),
+                                toBengaliDigits(ledgerList.size.toString()),
+                                Modifier.weight(1f),
+                                sub = toBengaliDigits(ledgerShown.size.toString()) + " " +
+                                    tr("টি নাম/খাত", "names")
+                            )
+                            LedgerStatBox(
+                                tr("সর্বোচ্চ", "Highest"),
+                                moneyText(ledgerMax),
+                                Modifier.weight(1f),
+                                sub = ledgerMaxName
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = ledgerQuery,
+                            onValueChange = { ledgerQuery = it },
+                            placeholder = {
+                                Text(text = tr("নাম বা খাত লিখে খুঁজুন...", "Search by name..."))
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = GreyText
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        if (ledgerShown.isEmpty()) {
+                            EmptyState(
+                                "📭",
+                                tr("এই সময়সীমায় কোনো হিসাব নেই", "No records in this period")
+                            )
+                        } else {
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = tr("নাম / খাত", "Name"),
+                                    modifier = Modifier.weight(1f),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GreyText
+                                )
+                                Text(
+                                    text = tr("লেনদেন", "Count"),
+                                    modifier = Modifier.width(64.dp),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GreyText,
+                                    textAlign = TextAlign.Center
+                                )
+                                Text(
+                                    text = tr("মোট", "Total"),
+                                    modifier = Modifier.width(88.dp),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GreyText,
+                                    textAlign = TextAlign.End
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            for ((name, amt) in ledgerShown) {
+                                val count = ledgerList.count {
+                                    (it.payer.ifBlank { it.category }) == name
+                                }
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().clickable {
+                                        HomeNavState.reportQuery = name
+                                        onOpenReport()
+                                    }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(text = "🏷️", fontSize = 14.sp)
+                                            Text(
+                                                text = name,
+                                                modifier = Modifier.padding(start = 6.dp),
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .padding(start = 6.dp)
+                                                    .background(GreyBg, RoundedCornerShape(10.dp))
+                                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = tr("খাত", "Ledger"),
+                                                    fontSize = 11.sp,
+                                                    color = GreyText
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            text = toBengaliDigits(count.toString()),
+                                            modifier = Modifier.width(64.dp),
+                                            fontSize = 14.sp,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        Text(
+                                            text = moneyText(amt),
+                                            modifier = Modifier.width(88.dp),
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            textAlign = TextAlign.End,
+                                            color = if (ledgerType == "ব্যয়") RedMain else GreenMain
+                                        )
+                                    }
+                                    LinearProgressIndicator(
+                                        progress = {
+                                            if (ledgerMax > 0L) amt.toFloat() / ledgerMax else 0f
+                                        },
+                                        modifier = Modifier.fillMaxWidth().height(6.dp),
+                                        color = if (ledgerType == "ব্যয়") RedMain else GreenMain,
+                                        trackColor = TrackGrey
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                }
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(GreyBg, RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 10.dp, vertical = 10.dp)
+                            ) {
+                                Text(
+                                    text = tr("মোট", "Total"),
+                                    modifier = Modifier.weight(1f),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = toBengaliDigits(ledgerList.size.toString()),
+                                    modifier = Modifier.width(64.dp),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center
+                                )
+                                Text(
+                                    text = moneyText(ledgerTotal),
+                                    modifier = Modifier.width(88.dp),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.End
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            // মাসিক বাজেট
+            if (isVisible("budget")) {
+                JomaSectionHeader(JomaBlue, tr("মাসিক বাজেট", "Monthly Budget"))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                        if (budgets.isEmpty()) {
+                            Button(
+                                onClick = onOpenBudget,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = GreyBg,
+                                    contentColor = Color.Black
+                                )
+                            ) {
+                                Text(
+                                    text = "+ " + tr("বাজেট সেট করুন", "Set Budget"),
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        } else {
+                            val totalLimit = budgets.sumOf { it.limitAmount }
+                            val totalSpent = budgets.sumOf { expenseByCatMonth[it.category] ?: 0L }
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = tr("খরচ", "Spent") + " " + moneyText(totalSpent) +
+                                        " / " + moneyText(totalLimit),
+                                    modifier = Modifier.weight(1f),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = percentOf(totalSpent, totalLimit),
+                                    fontSize = 13.sp,
+                                    color = GreyText
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                progress = {
+                                    if (totalLimit > 0L) {
+                                        (totalSpent.toFloat() / totalLimit).coerceIn(0f, 1f)
+                                    } else {
+                                        0f
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().height(8.dp),
+                                color = if (totalSpent > totalLimit) RedMain else GreenMain,
+                                trackColor = TrackGrey
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            for (b in budgets.take(3)) {
+                                val spent = expenseByCatMonth[b.category] ?: 0L
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = categoryLabel(b.category),
+                                        modifier = Modifier.weight(1f),
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        text = moneyText(spent) + " / " + moneyText(b.limitAmount),
+                                        fontSize = 13.sp,
+                                        color = GreyText
+                                    )
+                                }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                Text(
+                                    text = tr("বিস্তারিত দেখুন ›", "See details ›"),
+                                    modifier = Modifier.clickable { onOpenBudget() },
+                                    fontSize = 13.sp,
+                                    color = JomaBlue
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            // অ্যাকাউন্ট ব্যালেন্স
+            if (isVisible("accounts")) {
+                JomaSectionHeader(
+                    GreenMain,
+                    tr("অ্যাকাউন্ট ব্যালেন্স", "Account Balance"),
+                    trailing = {
+                        Button(
+                            onClick = { onAdd("ট্রান্সফার") },
+                            shape = RoundedCornerShape(20.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = JomaBlue,
+                                contentColor = Color.White
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SwapHoriz,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = tr("ট্রান্সফার", "Transfer"),
+                                modifier = Modifier.padding(start = 4.dp),
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                        if (accountBalances.isEmpty()) {
+                            AccountRow(
+                                tr("নগদ (হাতে)", "Cash in hand"),
+                                tr("হাতে থাকা টাকা", "Cash in hand"),
+                                totalsAll.balance
+                            )
+                        } else {
+                            for ((index, pair) in accountBalances.withIndex()) {
+                                val (acc, bal) = pair
+                                AccountRow(acc.name, accountKindLabel(acc.kind), bal)
+                                if (index < accountBalances.size - 1) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth().height(1.dp)
+                                            .background(TrackGrey)
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(GreyBg, RoundedCornerShape(12.dp))
+                                .padding(horizontal = 12.dp, vertical = 12.dp)
+                        ) {
+                            Text(
+                                text = tr("মোট (নগদ + সব অ্যাকাউন্ট)", "Total (cash + all accounts)"),
+                                modifier = Modifier.weight(1f),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = moneyText(totalBalance),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+            // সাম্প্রতিক লেনদেন — ডিলিট বোতাম ছাড়া
+            if (isVisible("recent")) {
+                JomaSectionHeader(JomaBlue, tr("সাম্প্রতিক লেনদেন", "Recent Transactions"))
+                if (transactions.isEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        EmptyState(
+                            "🧾",
+                            tr("এখনো কোনো লেনদেন যোগ করা হয়নি", "No transactions added yet")
+                        )
+                    }
+                } else {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                            val recent = transactions.take(10)
+                            for ((index, item) in recent.withIndex()) {
+                                RecentTransactionRow(item)
+                                if (index < recent.size - 1) {
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth().height(1.dp)
+                                            .background(TrackGrey)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            // খাত সম্পাদন ডায়ালগ
+            if (editCatType != null) {
+                val type = editCatType!!
+                AlertDialog(
+                    onDismissRequest = { editCatType = null },
+                    title = { Text(text = tr("খাত সম্পাদন করুন", "Edit Categories")) },
+                    text = {
+                        Column {
+                            for (cat in customCats) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = cat,
+                                        modifier = Modifier.weight(1f),
+                                        fontSize = 15.sp
+                                    )
+                                    IconButton(
+                                        onClick = {
+                                            val next = customCats - cat
+                                            saveCustomCategories(context, type, next)
+                                            customCats = next
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = null,
+                                            tint = RedMain,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            OutlinedTextField(
+                                value = newCatText,
+                                onValueChange = { newCatText = it },
+                                label = { Text(text = tr("নতুন খাতের নাম", "New category name")) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = {
+                                    val name = newCatText.trim()
+                                    if (name.isNotBlank() && name !in allCategories(context, type)) {
+                                        val next = customCats + name
+                                        saveCustomCategories(context, type, next)
+                                        customCats = next
+                                    }
+                                    newCatText = ""
+                                },
+                                enabled = newCatText.trim().isNotBlank(),
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = GreenMain)
+                            ) {
+                                Text(text = tr("খাত যোগ করুন", "Add Category"), fontSize = 15.sp)
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { editCatType = null }) {
+                            Text(text = tr("ঠিক আছে", "OK"))
+                        }
+                    }
+                )
             }
         }
-        item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 }
 
 @Composable
-fun QuickAddButton(
+private fun JomaTotalCard(
+    title: String,
+    amount: String,
+    icon: ImageVector,
+    color: Color,
+    bgColor: Color,
+    locked: Boolean,
+    onLockClick: () -> Unit,
+    expanded: Boolean,
+    onExpandClick: () -> Unit,
+    todayAmount: String,
+    weekAmount: String,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = bgColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(28.dp).background(Color.White, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = title,
+                        tint = color,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Text(
+                    text = title,
+                    modifier = Modifier.weight(1f).padding(start = 6.dp),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Icon(
+                    imageVector = if (locked) Icons.Default.Lock else Icons.Default.LockOpen,
+                    contentDescription = null,
+                    tint = GreyText,
+                    modifier = Modifier.size(16.dp).clickable { onLockClick() }
+                )
+            }
+            Text(
+                text = if (locked) "৳ ••••" else amount,
+                modifier = Modifier.padding(top = 8.dp),
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Box(
+                    modifier = Modifier.size(26.dp).background(Color.White, CircleShape)
+                        .clickable { onExpandClick() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = null,
+                        tint = GreyText,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            if (expanded) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = tr("আজকে", "Today") + ": " + todayAmount,
+                    fontSize = 12.sp,
+                    color = GreyText
+                )
+                Text(
+                    text = tr("এই সপ্তাহে", "This week") + ": " + weekAmount,
+                    fontSize = 12.sp,
+                    color = GreyText
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickAddTile(
     icon: ImageVector,
     label: String,
     color: Color,
@@ -393,21 +1531,355 @@ fun QuickAddButton(
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = bgColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(imageVector = icon, contentDescription = label, tint = color)
+            Box(
+                modifier = Modifier.size(38.dp).background(Color.White, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = color,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
             Text(
                 text = label,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = 6.dp),
                 fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.Black
+                fontWeight = FontWeight.SemiBold
             )
         }
+    }
+}
+
+@Composable
+private fun ChartTotalBox(
+    label: String,
+    amount: String,
+    bgColor: Color,
+    accent: Color
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(12.dp))
+            .padding(10.dp)
+    ) {
+        Text(text = label, fontSize = 12.sp, color = GreyText)
+        Text(
+            text = amount,
+            modifier = Modifier.padding(top = 2.dp),
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Black
+        )
+    }
+}
+
+@Composable
+private fun FlowStatBox(
+    title: String,
+    value: String,
+    bgColor: Color,
+    accent: Color,
+    modifier: Modifier
+) {
+    Column(
+        modifier = modifier.background(bgColor, RoundedCornerShape(12.dp)).padding(10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = title,
+            fontSize = 12.sp,
+            color = GreyText,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = value,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = accent,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun CategoryAnalysisCard(
+    type: String,
+    color: Color,
+    transactions: List<Transaction>,
+    today: LocalDate,
+    onEditCategories: (String) -> Unit,
+    onSeeAll: () -> Unit
+) {
+    var catPeriod by remember { mutableStateOf("মাসিক") }
+    val typeName = when (type) {
+        "আয়" -> tr("আয়ের", "Income")
+        "ব্যয়" -> tr("ব্যয়ের", "Expense")
+        else -> tr("সঞ্চয়ের", "Savings")
+    }
+    val totalLabel = when (type) {
+        "আয়" -> tr("মোট আয়", "Total Income")
+        "ব্যয়" -> tr("মোট ব্যয়", "Total Expense")
+        else -> tr("মোট সঞ্চয়", "Total Savings")
+    }
+    val emptyText = when (type) {
+        "আয়" -> tr("এই সময়সীমায় কোনো আয়ের হিসাব নেই", "No income records in this period")
+        "ব্যয়" -> tr("এই সময়সীমায় কোনো ব্যয়ের হিসাব নেই", "No expense records in this period")
+        else -> tr("এই সময়সীমায় কোনো সঞ্চয়ের হিসাব নেই", "No savings records in this period")
+    }
+    val groups = groupByCategory(filterByPeriod(transactions, catPeriod, today), type)
+    val total = groups.values.sum()
+    JomaSectionHeader(color, typeName + " " + tr("খাত অনুযায়ী বিশ্লেষণ", "Category Analysis"))
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f)
+                        .background(GreyBg, RoundedCornerShape(12.dp))
+                        .padding(3.dp)
+                ) {
+                    for (p in listOf("দৈনিক", "সাপ্তাহিক", "মাসিক", "বার্ষিক")) {
+                        val selected = catPeriod == p
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    if (selected) color else Color.Transparent,
+                                    RoundedCornerShape(9.dp)
+                                )
+                                .clickable { catPeriod = p }
+                                .padding(vertical = 7.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = periodLabel(p),
+                                color = if (selected) Color.White else Color.Black,
+                                fontSize = 12.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+                Text(
+                    text = tr("সম্পাদন করুন", "Edit"),
+                    modifier = Modifier.padding(start = 10.dp)
+                        .clickable { onEditCategories(type) },
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = JomaBlue
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RingDonut(
+                    if (total > 0L) color else TrackGrey,
+                    periodLabel(catPeriod),
+                    totalLabel,
+                    moneyText(total)
+                )
+                if (groups.isEmpty()) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        EmptyState("📭", emptyText)
+                    }
+                } else {
+                    Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                        for ((cat, amt) in groups.entries.take(5)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(30.dp)
+                                        .background(GreyBg, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(text = categoryIcon(cat), fontSize = 15.sp)
+                                }
+                                Text(
+                                    text = categoryLabel(cat),
+                                    modifier = Modifier.weight(1f).padding(start = 8.dp),
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = moneyText(amt),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            LinearProgressIndicator(
+                                progress = {
+                                    if (total > 0L) amt.toFloat() / total else 0f
+                                },
+                                modifier = Modifier.fillMaxWidth().height(6.dp),
+                                color = color,
+                                trackColor = TrackGrey
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+                    }
+                }
+            }
+            if (groups.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Text(
+                        text = tr("সব দেখুন", "See all"),
+                        modifier = Modifier.padding(top = 6.dp).clickable { onSeeAll() },
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = JomaBlue
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DueBox(
+    label: String,
+    amount: String,
+    bgColor: Color,
+    icon: String,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = bgColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = icon, fontSize = 14.sp)
+                Text(
+                    text = label,
+                    modifier = Modifier.padding(start = 4.dp),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Text(
+                text = amount,
+                modifier = Modifier.padding(top = 6.dp),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun LedgerStatBox(
+    title: String,
+    value: String,
+    modifier: Modifier,
+    sub: String = ""
+) {
+    Column(
+        modifier = modifier.background(GreyBg, RoundedCornerShape(12.dp)).padding(10.dp)
+    ) {
+        Text(text = title, fontSize = 12.sp, color = GreyText)
+        Text(
+            text = value,
+            modifier = Modifier.padding(top = 2.dp),
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold
+        )
+        if (sub.isNotBlank()) {
+            Text(text = sub, fontSize = 12.sp, color = GreyText)
+        }
+    }
+}
+
+@Composable
+private fun AccountRow(name: String, sub: String, balance: Long) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier.size(48.dp).background(GreyBg, RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.AccountBalanceWallet,
+                contentDescription = null,
+                tint = GreenMain,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
+            Text(text = name, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(text = sub, fontSize = 12.sp, color = GreyText)
+        }
+        Text(
+            text = moneyText(balance),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = GreenMain
+        )
+    }
+}
+
+@Composable
+private fun RecentTransactionRow(item: Transaction) {
+    val positive = item.type == "আয়"
+    val tint = when (item.type) {
+        "আয়" -> GreenTint
+        "ব্যয়" -> RedTint
+        else -> BlueTint
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier.size(48.dp).background(tint, RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = categoryIcon(item.category), fontSize = 22.sp)
+        }
+        Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
+            Text(
+                text = categoryLabel(item.category) +
+                    if (item.note.isNotBlank()) " • " + item.note else "",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = fullDateLabel(item.date) + " • " + timeLabel(item.time),
+                fontSize = 12.sp,
+                color = GreyText
+            )
+        }
+        Text(
+            text = moneyTextSigned(item.amount, positive),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (positive) GreenMain else RedMain
+        )
     }
 }
 
