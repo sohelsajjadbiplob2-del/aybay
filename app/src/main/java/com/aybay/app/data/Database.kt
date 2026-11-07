@@ -106,6 +106,9 @@ interface AyBayDao {
     @Query("SELECT * FROM budgets WHERE monthKey = :monthKey")
     fun budgetsOfMonth(monthKey: String): Flow<List<Budget>>
 
+    @Query("SELECT * FROM budgets")
+    fun allBudgets(): Flow<List<Budget>>
+
     @Insert
     suspend fun insertBudget(item: Budget): Long
 
