@@ -60,6 +60,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.biometric.BiometricPrompt
+import com.aybay.app.data.scheduleAutoIncome
 import com.aybay.app.ui.AddFormScreen
 import com.aybay.app.ui.AppPrefs
 import com.aybay.app.ui.AyBayViewModel
@@ -85,6 +86,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         LangState.isEnglish = isEnglishPref(this)
+        scheduleAutoIncome(this)
         setContent {
             val viewModel: AyBayViewModel = viewModel()
             viewModel.ensureDefaultAccount()
