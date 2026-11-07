@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,6 +39,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.cos
+import kotlin.math.sin
 
 val GreenDark = Color(0xFF0F6B5A)
 val GreenMain = Color(0xFF14957A)
@@ -413,6 +416,84 @@ fun ExpenseShareDonut(expense: Long, total: Long) {
                 color = Color.Black,
                 textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+// জমা খরচের মতো হোমের ব্যালেন্স পাই: সঞ্চয় (হালকা হলুদ) / নগদ (হালকা সবুজ) / ব্যয় (হালকা লাল)।
+// সব ০ থাকলেও তিন সমান ১২০° ভাগ দেখায়; নাম + শতাংশ ভাগের ওপরেই লেখা থাকে, মাঝখানে কিছু নেই।
+@Composable
+fun JomaBalanceDonut(
+    savings: Long,
+    cash: Long,
+    expense: Long
+) {
+    val s = maxOf(0L, savings)
+    val c = maxOf(0L, cash)
+    val e = maxOf(0L, expense)
+    val total = s + c + e
+    // জমার মতো উপর থেকে ঘড়ির কাঁটার দিকে: নগদ, ব্যয়, সঞ্চয়।
+    val parts = listOf(
+        Triple(GreenTint, c, tr("নগদ", "Cash")),
+        Triple(RedTint, e, tr("ব্যয়", "Expense")),
+        Triple(YellowTint, s, tr("সঞ্চয়", "Savings"))
+    )
+    val sweeps = if (total <= 0L) listOf(120f, 120f, 120f)
+    else parts.map { 360f * it.second.toFloat() / total.toFloat() }
+    val percents = if (total <= 0L) listOf(0, 0, 0)
+    else parts.map { (it.second * 100L / total).toInt() }
+    Box(modifier = Modifier.size(118.dp)) {
+        Canvas(modifier = Modifier.size(118.dp)) {
+            var start = -90f
+            for (i in parts.indices) {
+                val sweep = sweeps[i]
+                if (sweep > 0f) {
+                    // ভাগগুলোর মাঝে চিকন ফাঁক, যাতে সীমানা বোঝা যায়।
+                    val gap = minOf(2f, sweep / 2f)
+                    drawArc(
+                        color = parts[i].first,
+                        startAngle = start + gap / 2f,
+                        sweepAngle = sweep - gap,
+                        useCenter = true
+                    )
+                }
+                start += sweep
+            }
+        }
+        var start = -90f
+        for (i in parts.indices) {
+            val sweep = sweeps[i]
+            val mid = start + sweep / 2f
+            start += sweep
+            if (sweep < 30f) continue
+            val rad = Math.toRadians(mid.toDouble())
+            val lx = 59.dp + 32.dp * cos(rad).toFloat() - 24.dp
+            val ly = 59.dp + 32.dp * sin(rad).toFloat() - 15.dp
+            val pct = percents[i]
+            val pctText = if (LangState.isEnglish) "$pct%" else toBengaliDigits(pct.toString()) + "%"
+            Box(
+                modifier = Modifier.align(Alignment.TopStart).offset(lx, ly).size(48.dp, 30.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = parts[i].third,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = pctText,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1
+                    )
+                }
+            }
         }
     }
 }
