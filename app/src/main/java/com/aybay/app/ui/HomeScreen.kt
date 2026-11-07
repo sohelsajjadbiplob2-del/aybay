@@ -47,7 +47,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -187,11 +186,10 @@ fun HomeScreen(
     var lockedCards by remember { mutableStateOf(setOf<String>()) }
     var expandedCards by remember { mutableStateOf(setOf<String>()) }
 
-    // কার্ড সাজান: লুকানো সেকশন আর সেকশনের ক্রম ফোনে সেভ থাকে।
-    var hiddenSections by remember { mutableStateOf(loadHiddenHomeSections(context)) }
+    // কার্ড সাজান: সেকশনের ক্রম ফোনে সেভ থাকে, সব সেকশন সবসময় দেখায়।
     var arrangeMode by remember { mutableStateOf(false) }
     var sectionOrder by remember { mutableStateOf(loadHomeSectionOrder(context)) }
-    val orderedVisible = sectionOrder.filter { it !in hiddenSections }
+    val orderedVisible = sectionOrder
     fun moveSection(key: String, delta: Int) {
         val idx = sectionOrder.indexOf(key)
         val next = idx + delta
@@ -206,16 +204,6 @@ fun HomeScreen(
 
     // অটো আয় সেট ডায়ালগ।
     var showAutoDialog by remember { mutableStateOf(false) }
-    val sectionOptions = listOf(
-        "chart" to tr("মাসিক আয়-ব্যয়ের চার্ট", "Monthly income-expense chart"),
-        "flow" to tr("মাসিক ব্যয়ের ফ্লো চার্ট", "Monthly expense flow chart"),
-        "category" to tr("খাত অনুযায়ী বিশ্লেষণ", "Category analysis"),
-        "due" to tr("বাকি ও ধার", "Due & Loan"),
-        "ledger" to tr("নাম অনুযায়ী খাতা", "Name ledger"),
-        "budget" to tr("মাসিক বাজেট", "Monthly budget"),
-        "accounts" to tr("অ্যাকাউন্ট ব্যালেন্স", "Account balance"),
-        "recent" to tr("সাম্প্রতিক লেনদেন", "Recent transactions")
-    )
 
     // মাসিক চার্ট: দৈনিক/মাসিক টগল।
     var chartMode by remember { mutableStateOf("মাসিক") }
@@ -526,29 +514,6 @@ fun HomeScreen(
                         QuickAddTile(Icons.Default.Remove, tr("ব্যয়", "Expense"), RedMain, RedTint, Modifier.weight(1f)) { onAdd("ব্যয়") }
                         QuickAddTile(Icons.Default.Savings, tr("সঞ্চয়", "Savings"), OrangeMain, YellowTint, Modifier.weight(1f)) { onAdd("সঞ্চয়") }
                         QuickAddTile(Icons.Default.SwapHoriz, tr("ট্রান্সফার", "Transfer"), PurpleMain, PurpleTint, Modifier.weight(1f)) { onAdd("ট্রান্সফার") }
-                    }
-                    if (arrangeMode) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        for ((key, label) in sectionOptions) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().clickable {
-                                    val next = if (key in hiddenSections) hiddenSections - key else hiddenSections + key
-                                    saveHiddenHomeSections(context, next)
-                                    hiddenSections = next
-                                },
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Checkbox(
-                                    checked = key !in hiddenSections,
-                                    onCheckedChange = {
-                                        val next = if (key in hiddenSections) hiddenSections - key else hiddenSections + key
-                                        saveHiddenHomeSections(context, next)
-                                        hiddenSections = next
-                                    }
-                                )
-                                Text(text = label, fontSize = 14.sp)
-                            }
-                        }
                     }
                 }
             }
