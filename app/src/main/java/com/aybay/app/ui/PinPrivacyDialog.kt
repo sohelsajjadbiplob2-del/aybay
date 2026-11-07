@@ -1,6 +1,7 @@
 package com.aybay.app.ui
 
 import android.content.Context
+import android.widget.Toast
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
@@ -24,7 +25,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,7 +36,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -89,10 +88,12 @@ private fun LockToggleRow(label: String, checked: Boolean, onCheckedChange: (Boo
     }
 }
 
-// পিন সেট/বদলানোর ডায়ালগ: ৪-৬ সংখ্যার পিন।
+// পিন সেট/বদলানোর ডায়ালগ — জমার মতো: শিরোনাম "নতুন ৪–৬ সংখ্যার পিন দিন:",
+// শুধু সংখ্যার ইনপুট, বোতাম বাতিল (হালকা) / ঠিক আছে (নীল)।
 @Composable
 fun PinSetDialog(onSave: (String) -> Unit, onDismiss: () -> Unit) {
     var pin by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
     Dialog(onDismissRequest = onDismiss) {
         Card(
             shape = RoundedCornerShape(20.dp),
@@ -100,19 +101,97 @@ fun PinSetDialog(onSave: (String) -> Unit, onDismiss: () -> Unit) {
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
                 Text(
-                    text = tr("পিন সেট করুন", "Set PIN"),
-                    modifier = Modifier.fillMaxWidth(),
+                    text = tr("নতুন ৪–৬ সংখ্যার পিন দিন:", "Enter a new 4-6 digit PIN:"),
                     fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
+                    fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(14.dp))
                 OutlinedTextField(
                     value = pin,
-                    onValueChange = { v -> pin = v.filter { it.isDigit() }.take(6) },
-                    label = { Text(text = tr("৪-৬ সংখ্যার পিন", "4-6 digit PIN")) },
+                    onValueChange = { v ->
+                        pin = v.filter { it.isDigit() }.take(6)
+                        error = false
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true
+                )
+                if (error) {
+                    Text(
+                        text = tr("৪–৬ সংখ্যার পিন দিন", "Enter a 4-6 digit PIN"),
+                        color = Color.Red,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = GreyBg,
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        Text(text = tr("বাতিল", "Cancel"), fontSize = 15.sp)
+                    }
+                    Button(
+                        onClick = { if (pin.length in 4..6) onSave(pin) else error = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = JomaBlue)
+                    ) {
+                        Text(text = tr("ঠিক আছে", "OK"), fontSize = 15.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// সিকিউরিটি প্রশ্ন ডায়ালগ — পিন সেভের পর জমার মতো খোলে।
+// উত্তর ছোট হাতের করে ট্রিম করে সেভ হয়, মেলানোর সময়ও তাই।
+@Composable
+fun SecurityQuestionDialog(
+    prefs: AppPrefs,
+    onPrefsChange: (AppPrefs) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var question by remember { mutableStateOf("") }
+    var answer by remember { mutableStateOf("") }
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+                Text(
+                    text = tr(
+                        "পিন ভুলে গেলে পুনরুদ্ধারের জন্য একটি সিকিউরিটি প্রশ্ন ও উত্তর লিখুন:",
+                        "Write a security question and answer to recover your PIN if you forget it:"
+                    ),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                OutlinedTextField(
+                    value = question,
+                    onValueChange = { question = it },
+                    placeholder = { Text(text = tr("প্রশ্ন লিখুন", "Write a question")) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = answer,
+                    onValueChange = { answer = it },
+                    placeholder = { Text(text = tr("উত্তর লিখুন", "Write the answer")) },
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -120,20 +199,107 @@ fun PinSetDialog(onSave: (String) -> Unit, onDismiss: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    TextButton(
+                    Button(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = GreyBg,
+                            contentColor = Color.Black
+                        )
                     ) {
                         Text(text = tr("বাতিল", "Cancel"), fontSize = 15.sp)
                     }
                     Button(
-                        onClick = { onSave(pin) },
-                        enabled = pin.length >= 4,
+                        onClick = {
+                            onPrefsChange(
+                                prefs.copy(
+                                    securityQuestion = question.trim(),
+                                    securityAnswer = answer.trim().lowercase()
+                                )
+                            )
+                            onDismiss()
+                        },
+                        enabled = question.isNotBlank() && answer.isNotBlank(),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = JomaBlue)
                     ) {
-                        Text(text = tr("সংরক্ষণ করুন", "Save"), fontSize = 15.sp)
+                        Text(text = tr("সংরক্ষণ", "Save"), fontSize = 15.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// পিন ভুলে গেলে সিকিউরিটি প্রশ্নের উত্তর দিয়ে নতুন পিন সেট করা যায়।
+@Composable
+fun SecurityRecoveryDialog(
+    prefs: AppPrefs,
+    onCorrect: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var answer by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+                Text(
+                    text = tr("পিন পুনরুদ্ধার", "Recover PIN"),
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(text = prefs.securityQuestion, fontSize = 15.sp)
+                Spacer(modifier = Modifier.height(14.dp))
+                OutlinedTextField(
+                    value = answer,
+                    onValueChange = { answer = it; error = false },
+                    placeholder = { Text(text = tr("উত্তর লিখুন", "Write the answer")) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                if (error) {
+                    Text(
+                        text = tr("ভুল উত্তর", "Wrong answer"),
+                        color = Color.Red,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = GreyBg,
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        Text(text = tr("বাতিল", "Cancel"), fontSize = 15.sp)
+                    }
+                    Button(
+                        onClick = {
+                            if (answer.trim().lowercase() == prefs.securityAnswer) {
+                                onCorrect()
+                            } else {
+                                error = true
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = JomaBlue)
+                    ) {
+                        Text(text = tr("ঠিক আছে", "OK"), fontSize = 15.sp)
                     }
                 }
             }
@@ -154,12 +320,24 @@ fun PinUnlockDialog(
     val activity = context as? FragmentActivity
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
+    var showRecovery by remember { mutableStateOf(false) }
+    var showNewPin by remember { mutableStateOf(false) }
+    var showSecurityQ by remember { mutableStateOf(false) }
+    var info by remember { mutableStateOf("") }
     if (prefs.pin.isBlank()) {
         PinSetDialog(
-            onSave = { newPin -> onPrefsChange(prefs.copy(pin = newPin)) },
+            onSave = { newPin ->
+                onPrefsChange(prefs.copy(pin = newPin))
+                Toast.makeText(
+                    context,
+                    tr("পিন সংরক্ষণ করা হয়েছে", "PIN saved"),
+                    Toast.LENGTH_SHORT
+                ).show()
+                if (prefs.securityQuestion.isBlank()) showSecurityQ = true
+            },
             onDismiss = onDismiss
         )
-    } else {
+    } else if (!showRecovery && !showNewPin && !showSecurityQ) {
         Dialog(onDismissRequest = onDismiss) {
             Card(
                 shape = RoundedCornerShape(20.dp),
@@ -212,9 +390,63 @@ fun PinUnlockDialog(
                             Text(text = tr("ফিঙ্গারপ্রিন্ট", "Fingerprint"), fontSize = 16.sp)
                         }
                     }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = tr("পিন ভুলে গেছেন?", "Forgot PIN?"),
+                        color = JomaBlue,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable {
+                            if (prefs.securityQuestion.isBlank()) {
+                                info = tr(
+                                    "সিকিউরিটি প্রশ্ন সেট করা নেই",
+                                    "No security question set"
+                                )
+                            } else {
+                                showRecovery = true
+                            }
+                        }
+                    )
+                    if (info.isNotBlank()) {
+                        Text(
+                            text = info,
+                            color = Color.Red,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
                 }
             }
         }
+    }
+    if (showRecovery) {
+        SecurityRecoveryDialog(
+            prefs = prefs,
+            onCorrect = { showRecovery = false; showNewPin = true },
+            onDismiss = { showRecovery = false }
+        )
+    }
+    if (showNewPin) {
+        PinSetDialog(
+            onSave = { newPin ->
+                onPrefsChange(prefs.copy(pin = newPin))
+                Toast.makeText(
+                    context,
+                    tr("পিন সংরক্ষণ করা হয়েছে", "PIN saved"),
+                    Toast.LENGTH_SHORT
+                ).show()
+                showNewPin = false
+                onUnlocked()
+            },
+            onDismiss = { showNewPin = false }
+        )
+    }
+    if (showSecurityQ) {
+        SecurityQuestionDialog(
+            prefs = prefs,
+            onPrefsChange = onPrefsChange,
+            onDismiss = { showSecurityQ = false }
+        )
     }
 }
 
@@ -228,6 +460,7 @@ fun PinPrivacyDialog(
 ) {
     val context = LocalContext.current
     var showPinSet by remember { mutableStateOf(false) }
+    var showSecurityQ by remember { mutableStateOf(false) }
     var pendingSection by remember { mutableStateOf<String?>(null) }
     var pendingAppPin by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
@@ -246,6 +479,14 @@ fun PinPrivacyDialog(
         pendingSection = null
         pendingAppPin = false
         showPinSet = false
+        Toast.makeText(
+            context,
+            tr("পিন সংরক্ষণ করা হয়েছে", "PIN saved"),
+            Toast.LENGTH_SHORT
+        ).show()
+        // সিকিউরিটি প্রশ্ন আগে সেট না থাকলে এখন চাইবে; পিন বদলালে
+        // আগের প্রশ্ন থাকলে আর চাইবে না।
+        if (prefs.securityQuestion.isBlank()) showSecurityQ = true
         message = tr("পিন সেট হয়েছে", "PIN set")
     }
 
@@ -317,7 +558,9 @@ fun PinPrivacyDialog(
                                 prefs.copy(
                                     pin = "",
                                     appPinEnabled = false,
-                                    lockedSections = emptySet()
+                                    lockedSections = emptySet(),
+                                    securityQuestion = "",
+                                    securityAnswer = ""
                                 )
                             )
                         },
@@ -413,6 +656,13 @@ fun PinPrivacyDialog(
                 pendingSection = null
                 pendingAppPin = false
             }
+        )
+    }
+    if (showSecurityQ) {
+        SecurityQuestionDialog(
+            prefs = prefs,
+            onPrefsChange = onPrefsChange,
+            onDismiss = { showSecurityQ = false }
         )
     }
 }
