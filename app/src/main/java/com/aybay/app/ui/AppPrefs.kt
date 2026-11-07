@@ -76,13 +76,138 @@ fun saveHomeSectionOrder(context: Context, order: List<String>) {
 }
 
 // নিজের যোগ করা খাত: ডিফল্ট খাতের সঙ্গে যোগ হয়, Add ফর্মেও দেখা যায়।
-fun loadCustomCategories(context: Context, type: String): Set<String> =
+// সেভ ফরম্যাট: "নাম" (পুরনো) বা "নাম|আইকন" (নতুন)। নামে '|' থাকা যাবে না।
+private fun customCategoryRaw(context: Context, type: String): Set<String> =
     context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE)
         .getStringSet("custom_categories_" + type, emptySet()) ?: emptySet()
 
-fun saveCustomCategories(context: Context, type: String, cats: Set<String>) {
+private fun splitCustomEntry(entry: String): Pair<String, String> {
+    val idx = entry.indexOf('|')
+    return if (idx < 0) entry to "🏷️" else entry.substring(0, idx) to entry.substring(idx + 1)
+}
+
+private fun joinCustomEntry(name: String, icon: String): String =
+    if (icon == "🏷️" || icon.isBlank()) name else name + "|" + icon
+
+private fun saveCustomCategoryRaw(context: Context, type: String, entries: Set<String>) {
     context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE).edit()
-        .putStringSet("custom_categories_" + type, cats).apply()
+        .putStringSet("custom_categories_" + type, entries).apply()
+}
+
+private fun cleanCatName(name: String): String = name.replace("|", "").trim()
+
+fun loadCustomCategories(context: Context, type: String): Set<String> =
+    customCategoryRaw(context, type).map { splitCustomEntry(it).first }.toSet()
+
+fun loadCustomCategoryMap(context: Context, type: String): Map<String, String> =
+    customCategoryRaw(context, type).map { splitCustomEntry(it) }.toMap()
+
+fun saveCustomCategories(context: Context, type: String, cats: Set<String>) {
+    // আইকন না হারিয়ে সেভ: আগে থেকে থাকা নামের আইকন ধরে রাখা হয়।
+    val existing = loadCustomCategoryMap(context, type)
+    saveCustomCategoryRaw(
+        context, type,
+        cats.map { joinCustomEntry(it, existing[it] ?: "🏷️") }.toSet()
+    )
+}
+
+fun saveCustomCategory(context: Context, type: String, name: String, icon: String) {
+    val cleanName = cleanCatName(name)
+    if (cleanName.isBlank()) return
+    val next = loadCustomCategoryMap(context, type).toMutableMap()
+    next[cleanName] = icon.ifBlank { "🏷️" }
+    saveCustomCategoryRaw(
+        context, type,
+        next.entries.map { joinCustomEntry(it.key, it.value) }.toSet()
+    )
+}
+
+fun updateCustomCategoryIcon(context: Context, type: String, name: String, icon: String) {
+    saveCustomCategory(context, type, name, icon)
+}
+
+fun deleteCustomCategory(context: Context, type: String, name: String) {
+    val next = loadCustomCategoryMap(context, type).toMutableMap()
+    next.remove(name)
+    saveCustomCategoryRaw(
+        context, type,
+        next.entries.map { joinCustomEntry(it.key, it.value) }.toSet()
+    )
+    deleteCustomSubcatsFor(context, type, name)
+}
+
+fun renameCustomCategory(context: Context, type: String, oldName: String, newName: String) {
+    val cleanNew = cleanCatName(newName)
+    if (cleanNew.isBlank() || oldName == cleanNew) return
+    val map = loadCustomCategoryMap(context, type).toMutableMap()
+    val icon = map.remove(oldName) ?: "🏷️"
+    map[cleanNew] = icon
+    saveCustomCategoryRaw(
+        context, type,
+        map.entries.map { joinCustomEntry(it.key, it.value) }.toSet()
+    )
+    renameCustomSubcatCategory(context, type, oldName, cleanNew)
+}
+
+// নিজের যোগ করা উপখাত: "খাত|উপখাত" আকারে সেভ থাকে, খাতের ধরন অনুযায়ী।
+private fun customSubcatRaw(context: Context, type: String): Set<String> =
+    context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE)
+        .getStringSet("custom_subcats_" + type, emptySet()) ?: emptySet()
+
+private fun saveCustomSubcatRaw(context: Context, type: String, entries: Set<String>) {
+    context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE).edit()
+        .putStringSet("custom_subcats_" + type, entries).apply()
+}
+
+fun loadCustomSubcats(context: Context, type: String, category: String): List<String> =
+    customSubcatRaw(context, type).mapNotNull { entry ->
+        val idx = entry.indexOf('|')
+        if (idx < 0) null
+        else if (entry.substring(0, idx) == category) entry.substring(idx + 1)
+        else null
+    }
+
+fun addCustomSubcat(context: Context, type: String, category: String, subcat: String) {
+    val cleanSub = cleanCatName(subcat)
+    if (cleanSub.isBlank()) return
+    val next = customSubcatRaw(context, type).toMutableSet()
+    next.add(category + "|" + cleanSub)
+    saveCustomSubcatRaw(context, type, next)
+}
+
+fun deleteCustomSubcatsFor(context: Context, type: String, category: String) {
+    saveCustomSubcatRaw(
+        context, type,
+        customSubcatRaw(context, type).filter { it.substringBefore('|') != category }.toSet()
+    )
+}
+
+fun renameCustomSubcatCategory(context: Context, type: String, oldName: String, newName: String) {
+    saveCustomSubcatRaw(
+        context, type,
+        customSubcatRaw(context, type).map { entry ->
+            if (entry.substringBefore('|') == oldName) newName + "|" + entry.substringAfter('|')
+            else entry
+        }.toSet()
+    )
+}
+
+// জমা খরচের আয়ের খাতগুলোর উপখাত (হুবহু); ব্যয় ও সঞ্চয়ে শুধু অন্যান্য।
+fun defaultSubcats(type: String, category: String): List<String> = when (type) {
+    "আয়" -> when (category) {
+        "বেতন" -> listOf("মাসিক বেতন", "দৈনিক মজুরি", "সাপ্তাহিক বেতন", "অন্যান্য")
+        "ভাড়া" -> listOf("বাসা ভাড়া", "দোকান ভাড়া", "যানবাহন ভাড়া", "অন্যান্য")
+        "অনলাইন ইনকাম" -> listOf("ইউটিউব", "ফেসবুক", "টিকটক", "ওয়েবসাইট", "ফ্রিল্যান্সিং", "অন্যান্য")
+        else -> listOf("অন্যান্য")
+    }
+    else -> listOf("অন্যান্য")
+}
+
+fun allSubcats(context: Context, type: String, category: String): List<String> {
+    val defaults = defaultSubcats(type, category)
+    val base = defaults.filter { it != "অন্যান্য" }
+    val customs = loadCustomSubcats(context, type, category).filter { it !in defaults }
+    return base + customs + listOf("অন্যান্য")
 }
 
 fun allCategories(context: Context, type: String): List<String> {
