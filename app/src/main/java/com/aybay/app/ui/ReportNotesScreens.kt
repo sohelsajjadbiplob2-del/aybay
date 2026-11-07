@@ -33,7 +33,9 @@ import java.time.LocalDate
 fun ReportScreen(viewModel: AyBayViewModel) {
     val context = LocalContext.current
     val transactions by viewModel.transactions.collectAsState()
-    var query by remember { mutableStateOf("") }
+    // হোমের "নাম অনুযায়ী খাতা" থেকে নামে ট্যাপ করে এলে ওই নাম দিয়ে খোঁজা শুরু হয়।
+    var query by remember { mutableStateOf(HomeNavState.reportQuery) }
+    HomeNavState.reportQuery = ""
     var filter by remember { mutableStateOf("সব") }
     val monthKey = LocalDate.now().toString().substring(0, 7)
     val monthTotals by viewModel.totalsOfMonth(monthKey).collectAsState(initial = com.aybay.app.data.Totals())
