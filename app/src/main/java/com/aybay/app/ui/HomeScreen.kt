@@ -178,7 +178,6 @@ fun HomeScreen(
 
     var period by remember { mutableStateOf("মাসিক") }
     val shown = totalsOf(filterByPeriod(transactions, period, today))
-    val shownTotal = shown.income + shown.expense + shown.savings
 
     // মোট কার্ডের তালা: AppPrefs.lockedSections-এ সেভ থাকে (অ্যাপ বন্ধ করলেও থাকে)।
     // SharedPreferences থেকে প্রতিবার নতুন করে পড়া হয়, যাতে সেটিংসের ডায়ালগে
@@ -340,7 +339,7 @@ fun HomeScreen(
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Text(
-                                    text = tr("মোট ব্যালেন্স", "Total Balance"),
+                                    text = tr("বর্তমান হাতে নগদ", "Current Cash in Hand"),
                                     modifier = Modifier.padding(start = 6.dp),
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold
@@ -364,7 +363,7 @@ fun HomeScreen(
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                        ExpenseShareDonut(shown.expense, shownTotal)
+                        JomaBalanceDonut(shown.savings, totalsAll.balance, shown.expense)
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(
