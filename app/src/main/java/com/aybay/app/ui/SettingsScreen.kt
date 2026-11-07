@@ -96,9 +96,10 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val transactions by viewModel.transactions.collectAsState()
-    var pinText by remember { mutableStateOf("") }
+    var showPinDialog by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
 
+    Column(modifier = Modifier.fillMaxWidth()) {
     LazyColumn(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         item {
             Text(
@@ -132,49 +133,14 @@ fun SettingsScreen(
                 color = GreenDark
             )
             SectionTitle(tr("পিন ও গোপনীয়তা", "PIN & Privacy"))
-            OutlinedTextField(
-                value = pinText,
-                onValueChange = { v -> pinText = v.filter { it.isDigit() }.take(6) },
-                label = { Text(text = tr("নতুন পিন (৪-৬ সংখ্যা)", "New PIN (4-6 digits)")) },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true
-            )
-            Spacer(modifier = Modifier.height(8.dp))
             Button(
-                onClick = {
-                    if (pinText.length >= 4) {
-                        onPrefsChange(prefs.copy(pin = pinText))
-                        pinText = ""
-                        message = tr("পিন সেট হয়েছে", "PIN set")
-                    }
-                },
+                onClick = { showPinDialog = true },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = GreenMain)
             ) {
-                Text(text = tr("পিন সেট করুন", "Set PIN"), fontSize = 15.sp)
+                Text(text = tr("🔐 পিন ও গোপনীয়তা", "PIN & Privacy"), fontSize = 15.sp)
             }
-            if (prefs.pin.isNotBlank()) {
-                Text(
-                    text = tr("পিন মুছে ফেলুন", "Remove PIN"),
-                    modifier = Modifier
-                        .padding(top = 8.dp)
-                        .clickable { onPrefsChange(prefs.copy(pin = "")) },
-                    fontSize = 14.sp,
-                    color = RedMain
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = tr("ফিঙ্গারপ্রিন্ট আনলক", "Fingerprint unlock") + ": " +
-                    if (prefs.biometricEnabled) tr("চালু", "On") else tr("বন্ধ", "Off"),
-                modifier = Modifier.clickable {
-                    onPrefsChange(prefs.copy(biometricEnabled = !prefs.biometricEnabled))
-                },
-                fontSize = 15.sp,
-                color = GreenDark
-            )
             SectionTitle(tr("লাইভ সিঙ্ক", "Live Sync"))
             val syncOn = viewModel.sync.isAvailable
             Text(
@@ -260,5 +226,13 @@ fun SettingsScreen(
             )
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+    if (showPinDialog) {
+        PinPrivacyDialog(
+            prefs = prefs,
+            onPrefsChange = onPrefsChange,
+            onDismiss = { showPinDialog = false }
+        )
+    }
     }
 }
