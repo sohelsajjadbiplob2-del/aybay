@@ -68,16 +68,6 @@ fun saveHomeSectionOrder(context: Context, order: List<String>) {
         .putString("home_section_order", order.joinToString(",")).apply()
 }
 
-// হোমের সেকশন দেখানো/লুকানো (কার্ড সাজান): লুকানো সেকশনের key-গুলো সেভ থাকে।
-fun loadHiddenHomeSections(context: Context): Set<String> =
-    context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE)
-        .getStringSet("hidden_home_sections", emptySet()) ?: emptySet()
-
-fun saveHiddenHomeSections(context: Context, hidden: Set<String>) {
-    context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE).edit()
-        .putStringSet("hidden_home_sections", hidden).apply()
-}
-
 // নিজের যোগ করা খাত: ডিফল্ট খাতের সঙ্গে যোগ হয়, Add ফর্মেও দেখা যায়।
 fun loadCustomCategories(context: Context, type: String): Set<String> =
     context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE)
