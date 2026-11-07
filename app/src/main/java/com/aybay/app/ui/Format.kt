@@ -62,3 +62,38 @@ fun dateLabel(date: String): String {
     val name = if (LangState.isEnglish) enMonths[month - 1] else bnMonths[month - 1]
     return toBengaliDigits(day) + " " + name
 }
+
+// পূর্ণ তারিখ: "৬ নভেম্বর ২০২৬"।
+fun fullDateLabel(date: String): String {
+    if (date.length < 10) return date
+    val year = date.substring(0, 4)
+    val month = date.substring(5, 7).toIntOrNull() ?: 1
+    val day = date.substring(8, 10)
+    val bnMonths = listOf(
+        "জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন",
+        "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"
+    )
+    val enMonths = listOf(
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    )
+    val name = if (LangState.isEnglish) enMonths[month - 1] else bnMonths[month - 1]
+    return toBengaliDigits(day) + " " + name + " " + toBengaliDigits(year)
+}
+
+// সময়: "রাত ৮:৫৬"।
+fun timeLabel(time: String): String {
+    val parts = time.split(":")
+    val h = parts.getOrNull(0)?.toIntOrNull() ?: 0
+    val m = parts.getOrNull(1) ?: "00"
+    val h12 = if (h % 12 == 0) 12 else h % 12
+    val period = when (h) {
+        in 4..5 -> tr("ভোর", "Early morning")
+        in 6..11 -> tr("সকাল", "Morning")
+        in 12..15 -> tr("দুপুর", "Afternoon")
+        in 16..17 -> tr("বিকেল", "Evening")
+        in 18..19 -> tr("সন্ধ্যা", "Evening")
+        else -> tr("রাত", "Night")
+    }
+    return period + " " + toBengaliDigits(h12.toString()) + ":" + toBengaliDigits(m)
+}
