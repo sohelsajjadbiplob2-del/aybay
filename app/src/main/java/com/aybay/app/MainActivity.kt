@@ -1,10 +1,12 @@
 package com.aybay.app
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -69,6 +71,9 @@ import com.aybay.app.ui.BudgetScreen
 import com.aybay.app.ui.DueScreen
 import com.aybay.app.ui.GreenDark
 import com.aybay.app.ui.HomeScreen
+import com.aybay.app.ui.JomaBlue
+import com.aybay.app.ui.PinSetDialog
+import com.aybay.app.ui.SecurityRecoveryDialog
 import com.aybay.app.ui.LangState
 import com.aybay.app.ui.NotesScreen
 import com.aybay.app.ui.PageBg
@@ -308,8 +313,12 @@ fun LockScreen(
     onPinSet: (String) -> Unit,
     activity: FragmentActivity
 ) {
+    val context = LocalContext.current
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
+    var showRecovery by remember { mutableStateOf(false) }
+    var showNewPin by remember { mutableStateOf(false) }
+    var info by remember { mutableStateOf("") }
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -393,6 +402,49 @@ fun LockScreen(
                     Text(text = " " + tr("ফিঙ্গারপ্রিন্ট", "Fingerprint"), fontSize = 16.sp)
                 }
             }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = tr("পিন ভুলে গেছেন?", "Forgot PIN?"),
+                color = JomaBlue,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable {
+                    if (prefs.securityQuestion.isBlank()) {
+                        info = tr("সিকিউরিটি প্রশ্ন সেট করা নেই", "No security question set")
+                    } else {
+                        showRecovery = true
+                    }
+                }
+            )
+            if (info.isNotBlank()) {
+                Text(
+                    text = info,
+                    color = Color.Red,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
         }
+    }
+    if (showRecovery) {
+        SecurityRecoveryDialog(
+            prefs = prefs,
+            onCorrect = { showRecovery = false; showNewPin = true },
+            onDismiss = { showRecovery = false }
+        )
+    }
+    if (showNewPin) {
+        PinSetDialog(
+            onSave = { newPin ->
+                Toast.makeText(
+                    context,
+                    tr("পিন সংরক্ষণ করা হয়েছে", "PIN saved"),
+                    Toast.LENGTH_SHORT
+                ).show()
+                showNewPin = false
+                onPinSet(newPin)
+            },
+            onDismiss = { showNewPin = false }
+        )
     }
 }
