@@ -5,13 +5,16 @@ import android.app.TimePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -97,7 +100,19 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
     var accountExpanded by remember { mutableStateOf(false) }
     var accountDialog by remember { mutableStateOf<String?>(null) }
     var note by remember { mutableStateOf(initialNote) }
-    var showKeypad by remember { mutableStateOf(false) }
+    var subcat by remember { mutableStateOf("") }
+    var showCalc by remember { mutableStateOf(false) }
+    var showNewCatDialog by remember { mutableStateOf(false) }
+    var newCatName by remember { mutableStateOf("") }
+    var renameFor by remember { mutableStateOf<String?>(null) }
+    var pendingCatName by remember { mutableStateOf("") }
+    var showIconDialog by remember { mutableStateOf(false) }
+    var iconChangeFor by remember { mutableStateOf<String?>(null) }
+    var iconInitial by remember { mutableStateOf("✨") }
+    var showNewSubcatDialog by remember { mutableStateOf(false) }
+    var newSubcatName by remember { mutableStateOf("") }
+    var catMenuFor by remember { mutableStateOf<String?>(null) }
+    var catsTick by remember { mutableStateOf(0) }
     var detailsExpanded by remember { mutableStateOf(false) }
     var dateKey by remember { mutableStateOf(todayString()) }
     var time24 by remember { mutableStateOf(LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))) }
@@ -137,13 +152,23 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
     }
     val accountLabel = if (account == "হাতে নগদ") tr("হাতে নগদ", "Cash in hand") else account
 
-    val formCategories: List<String> = when (type) {
-        "আয়" -> JOMA_INCOME_CATS + loadCustomCategories(context, "আয়")
-            .filter { it !in JOMA_INCOME_CATS }
-        "ব্যয়" -> expenseCategories + loadCustomCategories(context, "ব্যয়")
-            .filter { it !in expenseCategories }
-        else -> listOf("সঞ্চয়", "অন্যান্য") + loadCustomCategories(context, "সঞ্চয়")
-            .filter { it !in listOf("সঞ্চয়", "অন্যান্য") }
+    // খাতের টাইল: ডিফল্ট খাত + নিজের খাত (অন্যান্য টাইলের আগে) + অন্যান্য (➕)।
+    val customCatMap = remember(type, catsTick) { loadCustomCategoryMap(context, type) }
+    val formCatItems: List<CatItem> = run {
+        val baseCats = when (type) {
+            "আয়" -> JOMA_INCOME_CATS
+            "ব্যয়" -> expenseCategories
+            else -> listOf("সঞ্চয়", "অন্যান্য")
+        }
+        val base = baseCats.filter { it != "অন্যান্য" }
+        val customs = customCatMap.entries
+            .filter { (name, _) -> name !in baseCats }
+            .map { (name, icon) -> CatItem(name, icon, true) }
+        base.map { CatItem(it, formTileIcon(it), false) } + customs +
+            listOf(CatItem("অন্যান্য", "➕", false))
+    }
+    val subcatOptions = remember(type, category, catsTick) {
+        if (category.isBlank()) emptyList() else allSubcats(context, type, category)
     }
 
     fun pickDate(onPick: (LocalDate) -> Unit) {
@@ -200,6 +225,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                             .clickable {
                                 type = t
                                 category = ""
+                                subcat = ""
                             }
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
@@ -273,38 +299,87 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
             }
             Spacer(modifier = Modifier.height(10.dp))
             val tileBgs = listOf(BlueTint, PinkTint, GreenTint, PurpleTint)
-            for (row in formCategories.chunked(4)) {
+            for ((rowIndex, row) in formCatItems.chunked(4).withIndex()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    for ((index, cat) in row.withIndex()) {
-                        val selected = category == cat
-                        val tileIndex = formCategories.indexOf(cat)
-                        Column(
+                    for ((index, item) in row.withIndex()) {
+                        val selected = category == item.name
+                        val tileIndex = rowIndex * 4 + index
+                        Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(88.dp)
-                                .background(tileBgs[tileIndex % 4], RoundedCornerShape(14.dp))
-                                .then(
-                                    if (selected) Modifier.border(
-                                        2.dp, mainColor, RoundedCornerShape(14.dp)
-                                    ) else Modifier
-                                )
-                                .clickable { category = cat }
-                                .padding(vertical = 10.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
                         ) {
-                            Text(text = formTileIcon(cat), fontSize = 28.sp)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = formTileLabel(cat),
-                                fontSize = 12.sp,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                textAlign = TextAlign.Center,
-                                maxLines = 2
-                            )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(tileBgs[tileIndex % 4], RoundedCornerShape(14.dp))
+                                    .then(
+                                        if (selected) Modifier.border(
+                                            2.dp, mainColor, RoundedCornerShape(14.dp)
+                                        ) else Modifier
+                                    )
+                                    .clickable {
+                                        if (item.name == "অন্যান্য") {
+                                            renameFor = null
+                                            newCatName = ""
+                                            showNewCatDialog = true
+                                        } else {
+                                            category = item.name
+                                            subcat = ""
+                                        }
+                                    }
+                                    .padding(vertical = 10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(text = item.icon, fontSize = 28.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = formTileLabel(item.name),
+                                    fontSize = 12.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 2
+                                )
+                            }
+                            if (selected) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .offset((-4).dp, (-4).dp)
+                                        .size(22.dp)
+                                        .background(GreenMain, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "✓",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            if (item.isCustom) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .offset(4.dp, (-4).dp)
+                                        .size(24.dp)
+                                        .background(JomaBlue, CircleShape)
+                                        .clickable { catMenuFor = item.name },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "⋮",
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
                         }
                         if (index == row.size - 1 && row.size < 4) {
                             repeat(4 - row.size) {
@@ -314,6 +389,54 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
+            }
+            // উপখাত
+            if (category.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = tr("উপখাত", "Sub-category"),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    for (sub in subcatOptions) {
+                        val subSelected = subcat == sub
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    if (subSelected) JomaBlue else GreyBg,
+                                    RoundedCornerShape(20.dp)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (subSelected) JomaBlue else TrackGrey,
+                                    RoundedCornerShape(20.dp)
+                                )
+                                .clickable {
+                                    if (sub == "অন্যান্য") {
+                                        newSubcatName = ""
+                                        showNewSubcatDialog = true
+                                    } else {
+                                        subcat = sub
+                                    }
+                                }
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = (if (subSelected) "✓ " else "") + categoryLabel(sub),
+                                color = if (subSelected) Color.White else Color.Black,
+                                fontSize = 13.sp,
+                                fontWeight = if (subSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(6.dp))
             // টাকা কোথায়
@@ -454,18 +577,9 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "🧮",
-                    modifier = Modifier.clickable { showKeypad = !showKeypad },
+                    modifier = Modifier.clickable { showCalc = true },
                     fontSize = 26.sp
                 )
-            }
-            if (showKeypad) {
-                Spacer(modifier = Modifier.height(10.dp))
-                NumberKeypad(onKey = { key ->
-                    amountText = when (key) {
-                        "⌫" -> if (amountText.isNotEmpty()) amountText.dropLast(1) else ""
-                        else -> (amountText + key).take(9)
-                    }
-                })
             }
             Spacer(modifier = Modifier.height(16.dp))
             // তারিখ ও সময়, নোট, প্রদানকারী তথ্য
@@ -639,6 +753,9 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
             Button(
                 onClick = {
                     val finalType = if (type == "ট্রান্সফার") "ব্যয়" else type
+                    val finalCategory =
+                        if (subcat.isNotBlank() && subcat != "অন্যান্য") "${category} — ${subcat}"
+                        else category
                     val payerParts = listOfNotNull(
                         payerAddress.trim().takeIf { it.isNotBlank() }
                             ?.let { tr("ঠিকানা", "Address") + ": " + it },
@@ -651,7 +768,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                         Transaction(
                             type = finalType,
                             amount = amount,
-                            category = category,
+                            category = finalCategory,
                             account = account,
                             date = dateKey,
                             time = time24,
@@ -716,37 +833,116 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                 }
             )
         }
-    }
-}
-
-@Composable
-fun NumberKeypad(onKey: (String) -> Unit) {
-    val rows = listOf(
-        listOf("1", "2", "3"),
-        listOf("4", "5", "6"),
-        listOf("7", "8", "9"),
-        listOf("00", "0", "⌫")
-    )
-    Column(modifier = Modifier.fillMaxWidth()) {
-        for (row in rows) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                for (key in row) {
-                    Text(
-                        text = toBengaliDigits(key),
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(GreyBg, RoundedCornerShape(10.dp))
-                            .padding(vertical = 12.dp)
-                            .clickable { onKey(key) },
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
+        if (showNewCatDialog) {
+            CategoryNameDialog(
+                title = if (renameFor != null) tr("খাতের নাম বদলান", "Rename category")
+                else tr("নতুন খাতের নাম লিখুন:", "Enter the new category name:"),
+                initial = newCatName,
+                onDismiss = {
+                    showNewCatDialog = false
+                    renameFor = null
+                },
+                onConfirm = { name ->
+                    showNewCatDialog = false
+                    val old = renameFor
+                    renameFor = null
+                    if (old != null) {
+                        renameCustomCategory(context, type, old, name)
+                        if (category == old) category = name
+                        catsTick++
+                    } else if (name.isNotBlank()) {
+                        val baseCats = when (type) {
+                            "আয়" -> JOMA_INCOME_CATS
+                            "ব্যয়" -> expenseCategories
+                            else -> listOf("সঞ্চয়", "অন্যান্য")
+                        }
+                        if (name in baseCats || name in customCatMap) {
+                            category = name
+                            subcat = ""
+                        } else {
+                            pendingCatName = name
+                            iconInitial = "✨"
+                            iconChangeFor = null
+                            showIconDialog = true
+                        }
+                    }
                 }
-            }
+            )
+        }
+        if (showIconDialog) {
+            IconPickerDialog(
+                initialIcon = iconInitial,
+                onDismiss = {
+                    showIconDialog = false
+                    iconChangeFor = null
+                },
+                onConfirm = { icon ->
+                    showIconDialog = false
+                    val target = iconChangeFor
+                    iconChangeFor = null
+                    if (target != null) {
+                        updateCustomCategoryIcon(context, type, target, icon)
+                    } else if (pendingCatName.isNotBlank()) {
+                        saveCustomCategory(context, type, pendingCatName, icon)
+                        category = pendingCatName
+                        subcat = ""
+                        pendingCatName = ""
+                    }
+                    catsTick++
+                }
+            )
+        }
+        if (showNewSubcatDialog) {
+            CategoryNameDialog(
+                title = tr("নতুন উপখাতের নাম লিখুন:", "Enter the new sub-category name:"),
+                initial = newSubcatName,
+                onDismiss = { showNewSubcatDialog = false },
+                onConfirm = { name ->
+                    showNewSubcatDialog = false
+                    if (name.isNotBlank()) {
+                        addCustomSubcat(context, type, category, name)
+                        subcat = name
+                        catsTick++
+                    }
+                }
+            )
+        }
+        catMenuFor?.let { menuCat ->
+            CategoryMenuDialog(
+                catName = menuCat,
+                onDismiss = { catMenuFor = null },
+                onRename = {
+                    catMenuFor = null
+                    renameFor = menuCat
+                    newCatName = menuCat
+                    showNewCatDialog = true
+                },
+                onChangeIcon = {
+                    catMenuFor = null
+                    iconChangeFor = menuCat
+                    iconInitial = customCatMap[menuCat] ?: "✨"
+                    showIconDialog = true
+                },
+                onDelete = {
+                    catMenuFor = null
+                    deleteCustomCategory(context, type, menuCat)
+                    if (category == menuCat) {
+                        category = ""
+                        subcat = ""
+                    }
+                    catsTick++
+                }
+            )
+        }
+        if (showCalc) {
+            CalculatorSheet(
+                initialAmount = amountText,
+                onDismiss = { showCalc = false },
+                onApply = { result ->
+                    amountText = result
+                    showCalc = false
+                }
+            )
         }
     }
 }
