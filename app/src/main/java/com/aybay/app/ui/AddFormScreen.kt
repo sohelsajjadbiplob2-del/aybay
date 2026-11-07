@@ -79,13 +79,20 @@ private fun formTileIcon(cat: String): String = when (cat) {
     "খাবার" -> "🍲"
     "যাতায়াত" -> "🚌"
     "ধর্মীয় দান" -> "🤲"
-    "হাতখরচ" -> "💵"
+    "ধর্মীয় দান/সহযোগিতা" -> "🤲"
+    "হাতখরচ" -> "👛"
     "তেল/গ্যাস" -> "⛽"
+    "যানবাহনের তেল/গ্যাস" -> "⛽"
     "মার্কেট/শপিং" -> "🛍️"
     "গাড়ি ভাড়া" -> "🚗"
     "রেস্টুরেন্ট" -> "🍽️"
     "বাসা ভাড়া" -> "🏠"
     "দোকান ভাড়া" -> "🏪"
+    "ফি" -> "🎓"
+    "মেনটেনেন্স" -> "🔧"
+    "উন্নয়নমূলক খরচ" -> "🏗️"
+    "কিস্তি" -> "💳"
+    "অন্যান্য ব্যয়" -> "➕"
     "দৈনিক মজুরি" -> "👷"
     else -> "🏷️"
 }
@@ -160,7 +167,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
             "ব্যয়" -> expenseCategories
             else -> listOf("সঞ্চয়", "অন্যান্য")
         }
-        val base = baseCats.filter { it != "অন্যান্য" }
+        val base = baseCats.filter { it != "অন্যান্য" && it != "অন্যান্য ব্যয়" }
         val customs = customCatMap.entries
             .filter { (name, _) -> name !in baseCats }
             .map { (name, icon) -> CatItem(name, icon, true) }
@@ -338,7 +345,8 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                                 Text(text = item.icon, fontSize = 28.sp)
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = formTileLabel(item.name),
+                                    text = if (item.name == "অন্যান্য" && type == "ব্যয়") tr("অন্যান্য ব্যয়", "Other Expenses")
+                                        else formTileLabel(item.name),
                                     fontSize = 12.sp,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                                     textAlign = TextAlign.Center,
@@ -449,7 +457,8 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = tr("টাকা কোথায় জমা হচ্ছে", "Where is the money going"),
+                    text = if (type == "ব্যয়") tr("টাকা কোথা থেকে বের হচ্ছে", "Where is the money coming from")
+                        else tr("টাকা কোথায় জমা হচ্ছে", "Where is the money going"),
                     modifier = Modifier.weight(1f),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
@@ -571,13 +580,21 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                     onValueChange = { v -> amountText = v.filter { it.isDigit() }.take(9) },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
+                    enabled = category.isNotBlank(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    placeholder = {
+                        Text(
+                            text = if (category.isBlank()) tr("আগে উপরে খাত বাছুন", "Pick a category above first")
+                                else "0.00",
+                            color = GreyText
+                        )
+                    },
                     shape = RoundedCornerShape(12.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "🧮",
-                    modifier = Modifier.clickable { showCalc = true },
+                    modifier = Modifier.clickable(enabled = category.isNotBlank()) { showCalc = true },
                     fontSize = 26.sp
                 )
             }
@@ -592,7 +609,8 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = tr("তারিখ ও সময়, নোট, প্রদানকারী তথ্য", "Date & time, note, payer info"),
+                    text = if (type == "ব্যয়") tr("তারিখ ও সময়, নোট, গ্রহণকারী তথ্য", "Date & time, note, receiver info")
+                        else tr("তারিখ ও সময়, নোট, প্রদানকারী তথ্য", "Date & time, note, payer info"),
                     modifier = Modifier.weight(1f),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
@@ -695,7 +713,8 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "👤 " + tr("প্রদানকারীর তথ্য যোগ করুন", "Add payer info"),
+                        text = "👤 " + if (type == "ব্যয়") tr("যাকে দেওয়া হয়েছে তার তথ্য যোগ করুন", "Add receiver info")
+                            else tr("প্রদানকারীর তথ্য যোগ করুন", "Add payer info"),
                         modifier = Modifier.weight(1f),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold
