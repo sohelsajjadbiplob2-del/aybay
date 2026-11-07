@@ -200,6 +200,8 @@ fun HomeScreen(
 
     // মোট কার্ডের তালা আর ড্রপডাউন (কোন কার্ড লক/খোলা আছে)।
     var lockedCards by remember { mutableStateOf(setOf<String>()) }
+    // তালা চাপলে কনফার্ম পপআপ: কোন কার্ড লক করতে চাওয়া হচ্ছে ("আয়"/"ব্যয়"/"সঞ্চয়")।
+    var lockConfirmCard by remember { mutableStateOf<String?>(null) }
     var expandedCards by remember { mutableStateOf(setOf<String>()) }
 
     // ব্যালেন্স লুকানো/দেখানো (চোখের আইকন)।
@@ -441,7 +443,7 @@ fun HomeScreen(
                     bgColor = GreenTint,
                     locked = "আয়" in lockedCards,
                     onLockClick = {
-                        lockedCards = if ("আয়" in lockedCards) lockedCards - "আয়" else lockedCards + "আয়"
+                        if ("আয়" in lockedCards) lockedCards = lockedCards - "আয়" else lockConfirmCard = "আয়"
                     },
                     expanded = "আয়" in expandedCards,
                     onExpandClick = {
@@ -461,7 +463,7 @@ fun HomeScreen(
                     bgColor = RedTint,
                     locked = "ব্যয়" in lockedCards,
                     onLockClick = {
-                        lockedCards = if ("ব্যয়" in lockedCards) lockedCards - "ব্যয়" else lockedCards + "ব্যয়"
+                        if ("ব্যয়" in lockedCards) lockedCards = lockedCards - "ব্যয়" else lockConfirmCard = "ব্যয়"
                     },
                     expanded = "ব্যয়" in expandedCards,
                     onExpandClick = {
@@ -481,7 +483,7 @@ fun HomeScreen(
                     bgColor = YellowTint,
                     locked = "সঞ্চয়" in lockedCards,
                     onLockClick = {
-                        lockedCards = if ("সঞ্চয়" in lockedCards) lockedCards - "সঞ্চয়" else lockedCards + "সঞ্চয়"
+                        if ("সঞ্চয়" in lockedCards) lockedCards = lockedCards - "সঞ্চয়" else lockConfirmCard = "সঞ্চয়"
                     },
                     expanded = "সঞ্চয়" in expandedCards,
                     onExpandClick = {
@@ -1597,17 +1599,103 @@ fun HomeScreen(
                     }
                 )
             }
-            if (showAutoDialog) {
-                AutoIncomeDialog(
-                    prefs = prefs,
-                    onDismiss = { showAutoDialog = false },
-                    onSave = { next ->
-                        saveAppPrefs(context, next)
-                        prefs = next
-                        scheduleAutoIncome(context)
-                        showAutoDialog = false
+        }
+    }
+    // ডায়ালগগুলো LazyColumn-এর বাইরে: হোমের উপরে থাকলেও কম্পোজ হয়।
+    if (showAutoDialog) {
+        AutoIncomeDialog(
+            prefs = prefs,
+            onDismiss = { showAutoDialog = false },
+            onSave = { next ->
+                saveAppPrefs(context, next)
+                prefs = next
+                scheduleAutoIncome(context)
+                showAutoDialog = false
+            }
+        )
+    }
+    // তালা কনফার্ম পপআপ: "লক করবেন কি?"
+    if (lockConfirmCard != null) {
+        val confirmKey = lockConfirmCard!!
+        val cardTitleBn = when (confirmKey) {
+            "আয়" -> "মোট আয়"
+            "ব্যয়" -> "মোট ব্যয়"
+            else -> "নীট সঞ্চয়"
+        }
+        val cardTitleEn = when (confirmKey) {
+            "আয়" -> "Total Income"
+            "ব্যয়" -> "Total Expense"
+            else -> "Net Savings"
+        }
+        Dialog(onDismissRequest = { lockConfirmCard = null }) {
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                modifier = Modifier.border(2.dp, OrangeMain, RoundedCornerShape(20.dp))
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier.size(72.dp)
+                            .background(YellowTint, CircleShape)
+                            .border(2.dp, OrangeMain, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "🔒", fontSize = 28.sp)
                     }
-                )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        text = tr("লক করবেন কি?", "Lock this?"),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = JomaBlue,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = tr("আপনি কি '" + cardTitleBn + "' লক করতে চান?", "Do you want to lock '" + cardTitleEn + "'?"),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = tr("লক করলে এই অংশের টাকার হিসাব গোপন থাকবে এবং দেখতে পিন বা বায়োমেট্রিক লাগবে।", "Once locked, this amount will stay hidden and viewing it will need a PIN or biometric."),
+                        fontSize = 13.sp,
+                        color = GreyText,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { lockConfirmCard = null },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = GreyBg,
+                                contentColor = Color.Black
+                            )
+                        ) {
+                            Text(text = tr("না, থাকুক", "No, keep it"), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        Button(
+                            onClick = {
+                                lockedCards = lockedCards + confirmKey
+                                lockConfirmCard = null
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = JomaBlue)
+                        ) {
+                            Text(text = tr("হ্যাঁ, লক করুন", "Yes, lock it"), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
             }
         }
     }
@@ -1693,44 +1781,6 @@ private fun JomaTotalCard(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun QuickAddTile(
-    emoji: String,
-    label: String,
-    bgColor: Color,
-    modifier: Modifier,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier.size(38.dp).background(Color.White, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = emoji,
-                    fontSize = 20.sp
-                )
-            }
-            Text(
-                text = label,
-                modifier = Modifier.padding(top = 6.dp),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold
-            )
         }
     }
 }
@@ -2412,32 +2462,6 @@ private fun AutoIncomeDialog(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun AutoCategoryChip(
-    label: String,
-    icon: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .background(if (selected) GreenMain else Color.White, RoundedCornerShape(20.dp))
-            .border(1.dp, if (selected) GreenMain else TrackGrey, RoundedCornerShape(20.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = icon, fontSize = 13.sp)
-        Text(
-            text = label,
-            modifier = Modifier.padding(start = 4.dp),
-            fontSize = 13.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-            color = if (selected) Color.White else Color.Black
-        )
     }
 }
 
