@@ -5,8 +5,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,13 +18,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Note
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,7 +53,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -70,8 +69,11 @@ import com.aybay.app.ui.GreenDark
 import com.aybay.app.ui.HomeScreen
 import com.aybay.app.ui.LangState
 import com.aybay.app.ui.NotesScreen
+import com.aybay.app.ui.PageBg
 import com.aybay.app.ui.ReportScreen
 import com.aybay.app.ui.SettingsScreen
+import com.aybay.app.ui.VoiceScreen
+import com.aybay.app.ui.VoiceText
 import com.aybay.app.ui.isEnglishPref
 import com.aybay.app.ui.loadAppPrefs
 import com.aybay.app.ui.parseBackupJson
@@ -133,6 +135,7 @@ fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPref
     }
 
     Scaffold(
+        containerColor = PageBg,
         topBar = {
             TopAppBar(
                 title = {
@@ -146,22 +149,43 @@ fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPref
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        Text(
-                            text = " " + tr("আয় - ব্যয়", "Ay - Bay"),
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Column(modifier = Modifier.padding(start = 8.dp)) {
+                            Text(
+                                text = tr("আয় - ব্যয়", "Ay - Bay"),
+                                fontSize = 19.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = tr("আয়-ব্যয়ের দৈনন্দিন হিসাব", "Daily income-expense tracker"),
+                                fontSize = 12.sp,
+                                color = Color.Gray
+                            )
+                        }
                     }
                 },
                 actions = {
                     IconButton(onClick = { navController.navigate("report") }) {
                         Icon(imageVector = Icons.Default.Search, contentDescription = tr("খুঁজুন", "Search"))
                     }
-                    IconButton(onClick = { navController.navigate("notes") }) {
-                        Icon(imageVector = Icons.Default.Note, contentDescription = tr("নোট", "Notes"))
+                    Button(
+                        onClick = { navController.navigate("notes") },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFFACC15),
+                            contentColor = Color.Black
+                        ),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                        modifier = Modifier.height(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Note,
+                            contentDescription = tr("নোট", "Notes"),
+                            modifier = Modifier.padding(end = 2.dp)
+                        )
+                        Text(text = tr("নোট", "Notes"), fontSize = 13.sp)
                     }
                     IconButton(onClick = { navController.navigate("settings") }) {
-                        Icon(imageVector = Icons.Default.Menu, contentDescription = tr("মেনু", "Menu"))
+                        Icon(imageVector = Icons.Default.MoreVert, contentDescription = tr("মেনু", "Menu"))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
@@ -172,20 +196,19 @@ fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPref
                 val items = listOf(
                     "home" to tr("হোম", "Home"),
                     "due" to tr("বাকি ও ধার", "Due & Loan"),
-                    "budget" to tr("বাজেট ও খাত", "Budget"),
-                    "report" to tr("রিপোর্ট", "Report"),
-                    "more" to tr("আরও", "More")
+                    "budget" to tr("বাজেট ও খাতা", "Budget"),
+                    "report" to tr("তালিকা ও রিপোর্ট", "List & Report"),
+                    "voice" to tr("ভয়েস", "Voice")
                 )
                 val icons = listOf(
                     Icons.Default.Home,
                     Icons.Default.AccountBalanceWallet,
                     Icons.Default.Assessment,
-                    Icons.Default.Menu,
-                    Icons.Default.MoreHoriz
+                    Icons.Default.BarChart,
+                    Icons.Default.Mic
                 )
                 for ((index, item) in items.withIndex()) {
-                    val selected = route == item.first ||
-                        (item.first == "more" && (route == "notes" || route == "settings"))
+                    val selected = route == item.first
                     NavigationBarItem(
                         selected = selected,
                         onClick = { navController.navigate(item.first) },
@@ -202,7 +225,10 @@ fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPref
                     HomeScreen(
                         viewModel = viewModel,
                         onAdd = { type -> navController.navigate("add/" + type) },
-                        onOpenDue = { navController.navigate("due") }
+                        onOpenDue = { navController.navigate("due") },
+                        onOpenBudget = { navController.navigate("budget") },
+                        onOpenReport = { navController.navigate("report") },
+                        onOpenSettings = { navController.navigate("settings") }
                     )
                 }
                 composable(
@@ -210,7 +236,13 @@ fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPref
                     arguments = listOf(navArgument("type") { type = NavType.StringType })
                 ) { entry ->
                     val type = entry.arguments?.getString("type") ?: "আয়"
-                    AddFormScreen(viewModel = viewModel, initialType = type) {
+                    val initialNote = VoiceText.text
+                    VoiceText.text = ""
+                    AddFormScreen(
+                        viewModel = viewModel,
+                        initialType = type,
+                        initialNote = initialNote
+                    ) {
                         navController.popBackStack()
                     }
                 }
@@ -218,6 +250,14 @@ fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPref
                 composable("budget") { BudgetScreen(viewModel = viewModel) }
                 composable("report") { ReportScreen(viewModel = viewModel) }
                 composable("notes") { NotesScreen(viewModel = viewModel) }
+                composable("voice") {
+                    VoiceScreen(
+                        onUseText = { text ->
+                            VoiceText.text = text
+                            navController.navigate("add/ব্যয়")
+                        }
+                    )
+                }
                 composable("settings") {
                     SettingsScreen(
                         viewModel = viewModel,
@@ -228,34 +268,7 @@ fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPref
                         }
                     )
                 }
-                composable("more") {
-                    MoreScreen(navController = navController)
-                }
             }
-        }
-    }
-}
-
-@Composable
-fun MoreScreen(navController: NavHostController) {
-    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-        Text(text = tr("আরও", "More"), fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(16.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
-                .clickable { navController.navigate("notes") },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(imageVector = Icons.Default.Note, contentDescription = null)
-            Text(text = " " + tr("নোট", "Notes"), fontSize = 16.sp)
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
-                .clickable { navController.navigate("settings") },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(imageVector = Icons.Default.Settings, contentDescription = null)
-            Text(text = " " + tr("সেটিংস", "Settings"), fontSize = 16.sp)
         }
     }
 }
