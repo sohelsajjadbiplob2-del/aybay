@@ -70,6 +70,7 @@ class Repository(private val dao: AyBayDao) {
     suspend fun deleteDueItem(item: DueItem) = dao.deleteDueItem(item)
 
     fun budgetsOfMonth(monthKey: String): Flow<List<Budget>> = dao.budgetsOfMonth(monthKey)
+    fun allBudgets(): Flow<List<Budget>> = dao.allBudgets()
     suspend fun addBudget(item: Budget): Long = dao.insertBudget(item)
     suspend fun updateBudget(item: Budget) = dao.updateBudget(item)
 
