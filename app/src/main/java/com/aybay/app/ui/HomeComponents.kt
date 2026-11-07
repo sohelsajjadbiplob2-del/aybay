@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 
 // হোমের ছোট কম্পোনেন্ট — HomeScreen.kt ছোট রাখতে এখানে সরানো হয়েছে
 // (create_or_update_file-এ এক আর্গুমেন্টের 131072 বাইট সীমা পেরিয়ে যাচ্ছিল)।
+// বড় ফাইল ভাগ করা হলে পুশ আবার চলে — এই নিয়ম ভবিষ্যতের সব আপডেটেও মানতে হবে।
 
 @Composable
 private fun QuickAddTile(
