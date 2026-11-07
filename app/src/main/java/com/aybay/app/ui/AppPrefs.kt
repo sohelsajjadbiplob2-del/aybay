@@ -11,7 +11,11 @@ data class AppPrefs(
     val biometricEnabled: Boolean = false,
     val autoSalaryEnabled: Boolean = false,
     val autoSalaryAmount: Long = 0L,
-    val autoSalaryDay: Int = 1
+    val autoSalaryDay: Int = 1,
+    val autoSalaryCategory: String = "বেতন",
+    val autoDailyEnabled: Boolean = false,
+    val autoDailyAmount: Long = 0L,
+    val autoDailyCategory: String = "ব্যবসা"
 )
 
 fun loadAppPrefs(context: Context): AppPrefs {
@@ -23,7 +27,11 @@ fun loadAppPrefs(context: Context): AppPrefs {
         biometricEnabled = prefs.getBoolean("biometric_enabled", false),
         autoSalaryEnabled = prefs.getBoolean("auto_salary_enabled", false),
         autoSalaryAmount = prefs.getLong("auto_salary_amount", 0L),
-        autoSalaryDay = prefs.getInt("auto_salary_day", 1)
+        autoSalaryDay = prefs.getInt("auto_salary_day", 1),
+        autoSalaryCategory = prefs.getString("auto_salary_category", "বেতন") ?: "বেতন",
+        autoDailyEnabled = prefs.getBoolean("auto_daily_enabled", false),
+        autoDailyAmount = prefs.getLong("auto_daily_amount", 0L),
+        autoDailyCategory = prefs.getString("auto_daily_category", "ব্যবসা") ?: "ব্যবসা"
     )
 }
 
@@ -36,7 +44,28 @@ fun saveAppPrefs(context: Context, prefs: AppPrefs) {
         .putBoolean("auto_salary_enabled", prefs.autoSalaryEnabled)
         .putLong("auto_salary_amount", prefs.autoSalaryAmount)
         .putInt("auto_salary_day", prefs.autoSalaryDay)
+        .putString("auto_salary_category", prefs.autoSalaryCategory)
+        .putBoolean("auto_daily_enabled", prefs.autoDailyEnabled)
+        .putLong("auto_daily_amount", prefs.autoDailyAmount)
+        .putString("auto_daily_category", prefs.autoDailyCategory)
         .apply()
+}
+
+// হোমের সেকশনের ক্রম (কার্ড সাজান): কমা দিয়ে জোড়া key-গুলো সেভ থাকে।
+val defaultHomeSectionOrder = listOf(
+    "chart", "flow", "category", "due", "ledger", "budget", "accounts", "recent"
+)
+
+fun loadHomeSectionOrder(context: Context): List<String> {
+    val raw = context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE)
+        .getString("home_section_order", null) ?: return defaultHomeSectionOrder
+    val list = raw.split(",").map { it.trim() }.filter { it in defaultHomeSectionOrder }
+    return (list + defaultHomeSectionOrder).distinct()
+}
+
+fun saveHomeSectionOrder(context: Context, order: List<String>) {
+    context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE).edit()
+        .putString("home_section_order", order.joinToString(",")).apply()
 }
 
 // হোমের সেকশন দেখানো/লুকানো (কার্ড সাজান): লুকানো সেকশনের key-গুলো সেভ থাকে।
