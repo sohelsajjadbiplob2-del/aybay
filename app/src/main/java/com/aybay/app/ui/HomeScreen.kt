@@ -3,6 +3,8 @@ package com.aybay.app.ui
 import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +17,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -22,6 +28,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
@@ -45,6 +52,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -59,11 +68,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.aybay.app.data.Totals
 import com.aybay.app.data.Transaction
+import com.aybay.app.data.scheduleAutoIncome
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -163,21 +175,37 @@ fun HomeScreen(
     val monthKey = todayKey.substring(0, 7)
     val expenseByCatMonth by viewModel.categoryTotals(monthKey, "ব্যয়").collectAsState(initial = emptyMap())
     val budgets by viewModel.budgetsOfMonth(monthKey).collectAsState(initial = emptyList())
+    val allBudgets by viewModel.allBudgets().collectAsState(initial = emptyList())
+    val totalBudgetAll = allBudgets.sumOf { it.limitAmount }
+    var prefs by remember { mutableStateOf(loadAppPrefs(context)) }
 
     var period by remember { mutableStateOf("মাসিক") }
     val shown = totalsOf(filterByPeriod(transactions, period, today))
     val shownTotal = shown.income + shown.expense + shown.savings
-    val todayTotals = totalsOf(transactions.filter { it.date == todayKey })
-    val weekTotals = totalsOf(transactions.filter { it.date >= today.minusDays(6).toString() })
 
     // মোট কার্ডের তালা আর ড্রপডাউন (কোন কার্ড লক/খোলা আছে)।
     var lockedCards by remember { mutableStateOf(setOf<String>()) }
     var expandedCards by remember { mutableStateOf(setOf<String>()) }
 
-    // কার্ড সাজান: লুকানো সেকশন ফোনে সেভ থাকে।
+    // কার্ড সাজান: লুকানো সেকশন আর সেকশনের ক্রম ফোনে সেভ থাকে।
     var hiddenSections by remember { mutableStateOf(loadHiddenHomeSections(context)) }
-    var showArrange by remember { mutableStateOf(false) }
-    fun isVisible(key: String) = key !in hiddenSections
+    var arrangeMode by remember { mutableStateOf(false) }
+    var sectionOrder by remember { mutableStateOf(loadHomeSectionOrder(context)) }
+    val orderedVisible = sectionOrder.filter { it !in hiddenSections }
+    fun moveSection(key: String, delta: Int) {
+        val idx = sectionOrder.indexOf(key)
+        val next = idx + delta
+        if (idx < 0 || next < 0 || next >= sectionOrder.size) return
+        val list = sectionOrder.toMutableList()
+        val tmp = list[idx]
+        list[idx] = list[next]
+        list[next] = tmp
+        sectionOrder = list
+        saveHomeSectionOrder(context, list)
+    }
+
+    // অটো আয় সেট ডায়ালগ।
+    var showAutoDialog by remember { mutableStateOf(false) }
     val sectionOptions = listOf(
         "chart" to tr("মাসিক আয়-ব্যয়ের চার্ট", "Monthly income-expense chart"),
         "flow" to tr("মাসিক ব্যয়ের ফ্লো চার্ট", "Monthly expense flow chart"),
@@ -398,8 +426,10 @@ fun HomeScreen(
                     onExpandClick = {
                         expandedCards = if ("আয়" in expandedCards) expandedCards - "আয়" else expandedCards + "আয়"
                     },
-                    todayAmount = moneyText(todayTotals.income),
-                    weekAmount = moneyText(weekTotals.income),
+                    expandedLines = listOf(
+                        tr("মাসিক সেট", "Monthly set") + ": " + moneyText(prefs.autoSalaryAmount),
+                        tr("অটো সেট থেকে নির্ধারণ করুন", "Set from Auto Set")
+                    ),
                     modifier = Modifier.weight(1f)
                 )
                 JomaTotalCard(
@@ -416,8 +446,10 @@ fun HomeScreen(
                     onExpandClick = {
                         expandedCards = if ("ব্যয়" in expandedCards) expandedCards - "ব্যয়" else expandedCards + "ব্যয়"
                     },
-                    todayAmount = moneyText(todayTotals.expense),
-                    weekAmount = moneyText(weekTotals.expense),
+                    expandedLines = listOf(
+                        tr("মোট বাজেট", "Total Budget") + ": " + moneyText(totalBudgetAll),
+                        tr("বাজেট সেকশনে সেট করুন", "Set in Budget section")
+                    ),
                     modifier = Modifier.weight(1f)
                 )
                 JomaTotalCard(
@@ -434,8 +466,9 @@ fun HomeScreen(
                     onExpandClick = {
                         expandedCards = if ("সঞ্চয়" in expandedCards) expandedCards - "সঞ্চয়" else expandedCards + "সঞ্চয়"
                     },
-                    todayAmount = moneyText(todayTotals.netSavings),
-                    weekAmount = moneyText(weekTotals.netSavings),
+                    expandedLines = listOf(
+                        tr("মোট সঞ্চয়", "Total Savings") + ": " + moneyText(totalsAll.savings)
+                    ),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -457,23 +490,30 @@ fun HomeScreen(
                         )
                         Row(
                             modifier = Modifier
-                                .background(LightBlueCard, RoundedCornerShape(16.dp))
-                                .clickable { showArrange = !showArrange }
+                                .background(
+                                    if (arrangeMode) JomaBlue else LightBlueCard,
+                                    RoundedCornerShape(16.dp)
+                                )
+                                .clickable { arrangeMode = !arrangeMode }
                                 .padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.SwapHoriz,
+                                imageVector = if (arrangeMode) Icons.Default.Check else Icons.Default.SwapHoriz,
                                 contentDescription = null,
-                                tint = JomaBlue,
+                                tint = if (arrangeMode) Color.White else JomaBlue,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
-                                text = tr("কার্ড সাজান", "Arrange Cards"),
+                                text = if (arrangeMode) {
+                                    "✓ " + tr("সাজানো শেষ", "Done Arranging")
+                                } else {
+                                    tr("কার্ড সাজান", "Arrange Cards")
+                                },
                                 modifier = Modifier.padding(start = 4.dp),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = JomaBlue
+                                color = if (arrangeMode) Color.White else JomaBlue
                             )
                         }
                     }
@@ -487,7 +527,7 @@ fun HomeScreen(
                         QuickAddTile(Icons.Default.Savings, tr("সঞ্চয়", "Savings"), OrangeMain, YellowTint, Modifier.weight(1f)) { onAdd("সঞ্চয়") }
                         QuickAddTile(Icons.Default.SwapHoriz, tr("ট্রান্সফার", "Transfer"), PurpleMain, PurpleTint, Modifier.weight(1f)) { onAdd("ট্রান্সফার") }
                     }
-                    if (showArrange) {
+                    if (arrangeMode) {
                         Spacer(modifier = Modifier.height(12.dp))
                         for ((key, label) in sectionOptions) {
                             Row(
@@ -512,9 +552,20 @@ fun HomeScreen(
                     }
                 }
             }
-            // মাসিক আয়-ব্যয়ের চার্ট
-            if (isVisible("chart")) {
-                JomaSectionHeader(JomaBlue, tr("মাসিক আয়-ব্যয়ের চার্ট", "Monthly Income-Expense Chart"))
+        }
+        items(orderedVisible, key = { it }) { key ->
+            val pos = orderedVisible.indexOf(key)
+            when (key) {
+                "chart" -> {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                JomaSectionHeader(
+                    JomaBlue,
+                    if (chartMode == "দৈনিক") {
+                        tr("আজকের আয়-ব্যয়ের চার্ট", "Today's Income-Expense Chart")
+                    } else {
+                        tr("মাসিক আয়-ব্যয়ের চার্ট", "Monthly Income-Expense Chart")
+                    }
+                )
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -530,7 +581,7 @@ fun HomeScreen(
                             Box(
                                 modifier = Modifier
                                     .background(LightBlueCard, RoundedCornerShape(16.dp))
-                                    .clickable { onOpenSettings() }
+                                    .clickable { showAutoDialog = true }
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) {
                                 Text(
@@ -554,7 +605,7 @@ fun HomeScreen(
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Text(
-                                    text = monthLabel(monthKey),
+                                    text = if (chartMode == "দৈনিক") fullDateLabel(todayKey) else monthLabel(monthKey),
                                     modifier = Modifier.padding(start = 4.dp),
                                     fontSize = 13.sp
                                 )
@@ -629,9 +680,24 @@ fun HomeScreen(
                         }
                     }
                 }
-            }
-            // মাসিক ব্যয়ের ফ্লো চার্ট
-            if (isVisible("flow")) {
+                        if (arrangeMode) {
+                            Row(
+                                modifier = Modifier.align(Alignment.TopEnd)
+                                    .padding(top = 20.dp, end = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (pos > 0) {
+                                    MoveButton(Icons.Default.ArrowUpward) { moveSection(key, -1) }
+                                }
+                                if (pos < orderedVisible.size - 1) {
+                                    MoveButton(Icons.Default.ArrowDownward) { moveSection(key, 1) }
+                                }
+                            }
+                        }
+                    }
+                }
+                "flow" -> {
+                    Box(modifier = Modifier.fillMaxWidth()) {
                 JomaSectionHeader(GreenMain, tr("মাসিক ব্যয়ের ফ্লো চার্ট", "Monthly Expense Flow Chart"))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -788,9 +854,24 @@ fun HomeScreen(
                         }
                     }
                 }
-            }
-            // খাত অনুযায়ী বিশ্লেষণ — ৩টা আলাদা কার্ড
-            if (isVisible("category")) {
+                        if (arrangeMode) {
+                            Row(
+                                modifier = Modifier.align(Alignment.TopEnd)
+                                    .padding(top = 20.dp, end = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (pos > 0) {
+                                    MoveButton(Icons.Default.ArrowUpward) { moveSection(key, -1) }
+                                }
+                                if (pos < orderedVisible.size - 1) {
+                                    MoveButton(Icons.Default.ArrowDownward) { moveSection(key, 1) }
+                                }
+                            }
+                        }
+                    }
+                }
+                "category" -> {
+                    Box(modifier = Modifier.fillMaxWidth()) {
                 CategoryAnalysisCard(
                     type = "ব্যয়",
                     color = RedMain,
@@ -827,9 +908,24 @@ fun HomeScreen(
                     },
                     onSeeAll = onOpenReport
                 )
-            }
-            // বাকি ও ধার (Cash)
-            if (isVisible("due")) {
+                        if (arrangeMode) {
+                            Row(
+                                modifier = Modifier.align(Alignment.TopEnd)
+                                    .padding(top = 20.dp, end = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (pos > 0) {
+                                    MoveButton(Icons.Default.ArrowUpward) { moveSection(key, -1) }
+                                }
+                                if (pos < orderedVisible.size - 1) {
+                                    MoveButton(Icons.Default.ArrowDownward) { moveSection(key, 1) }
+                                }
+                            }
+                        }
+                    }
+                }
+                "due" -> {
+                    Box(modifier = Modifier.fillMaxWidth()) {
                 JomaSectionHeader(
                     JomaBlue,
                     tr("বাকি ও ধার (Cash)", "Due & Loan (Cash)"),
@@ -857,9 +953,24 @@ fun HomeScreen(
                         DueBox(tr("ধার দেওয়া (Cash)", "Lent (Cash)"), moneyText(lent), GreenTint, "🟢", Modifier.weight(1f)) { onOpenDue() }
                     }
                 }
-            }
-            // নাম অনুযায়ী খাতা
-            if (isVisible("ledger")) {
+                        if (arrangeMode) {
+                            Row(
+                                modifier = Modifier.align(Alignment.TopEnd)
+                                    .padding(top = 20.dp, end = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (pos > 0) {
+                                    MoveButton(Icons.Default.ArrowUpward) { moveSection(key, -1) }
+                                }
+                                if (pos < orderedVisible.size - 1) {
+                                    MoveButton(Icons.Default.ArrowDownward) { moveSection(key, 1) }
+                                }
+                            }
+                        }
+                    }
+                }
+                "ledger" -> {
+                    Box(modifier = Modifier.fillMaxWidth()) {
                 JomaSectionHeader(JomaBlue, tr("নাম অনুযায়ী খাতা", "Ledger by Name"))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -1152,9 +1263,24 @@ fun HomeScreen(
                         }
                     }
                 }
-            }
-            // মাসিক বাজেট
-            if (isVisible("budget")) {
+                        if (arrangeMode) {
+                            Row(
+                                modifier = Modifier.align(Alignment.TopEnd)
+                                    .padding(top = 20.dp, end = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (pos > 0) {
+                                    MoveButton(Icons.Default.ArrowUpward) { moveSection(key, -1) }
+                                }
+                                if (pos < orderedVisible.size - 1) {
+                                    MoveButton(Icons.Default.ArrowDownward) { moveSection(key, 1) }
+                                }
+                            }
+                        }
+                    }
+                }
+                "budget" -> {
+                    Box(modifier = Modifier.fillMaxWidth()) {
                 JomaSectionHeader(JomaBlue, tr("মাসিক বাজেট", "Monthly Budget"))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -1241,9 +1367,24 @@ fun HomeScreen(
                         }
                     }
                 }
-            }
-            // অ্যাকাউন্ট ব্যালেন্স
-            if (isVisible("accounts")) {
+                        if (arrangeMode) {
+                            Row(
+                                modifier = Modifier.align(Alignment.TopEnd)
+                                    .padding(top = 20.dp, end = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (pos > 0) {
+                                    MoveButton(Icons.Default.ArrowUpward) { moveSection(key, -1) }
+                                }
+                                if (pos < orderedVisible.size - 1) {
+                                    MoveButton(Icons.Default.ArrowDownward) { moveSection(key, 1) }
+                                }
+                            }
+                        }
+                    }
+                }
+                "accounts" -> {
+                    Box(modifier = Modifier.fillMaxWidth()) {
                 JomaSectionHeader(
                     GreenMain,
                     tr("অ্যাকাউন্ট ব্যালেন্স", "Account Balance"),
@@ -1318,9 +1459,24 @@ fun HomeScreen(
                         }
                     }
                 }
-            }
-            // সাম্প্রতিক লেনদেন — ডিলিট বোতাম ছাড়া
-            if (isVisible("recent")) {
+                        if (arrangeMode) {
+                            Row(
+                                modifier = Modifier.align(Alignment.TopEnd)
+                                    .padding(top = 20.dp, end = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (pos > 0) {
+                                    MoveButton(Icons.Default.ArrowUpward) { moveSection(key, -1) }
+                                }
+                                if (pos < orderedVisible.size - 1) {
+                                    MoveButton(Icons.Default.ArrowDownward) { moveSection(key, 1) }
+                                }
+                            }
+                        }
+                    }
+                }
+                "recent" -> {
+                    Box(modifier = Modifier.fillMaxWidth()) {
                 JomaSectionHeader(JomaBlue, tr("সাম্প্রতিক লেনদেন", "Recent Transactions"))
                 if (transactions.isEmpty()) {
                     Card(
@@ -1355,7 +1511,25 @@ fun HomeScreen(
                         }
                     }
                 }
+                        if (arrangeMode) {
+                            Row(
+                                modifier = Modifier.align(Alignment.TopEnd)
+                                    .padding(top = 20.dp, end = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (pos > 0) {
+                                    MoveButton(Icons.Default.ArrowUpward) { moveSection(key, -1) }
+                                }
+                                if (pos < orderedVisible.size - 1) {
+                                    MoveButton(Icons.Default.ArrowDownward) { moveSection(key, 1) }
+                                }
+                            }
+                        }
+                    }
+                }
             }
+        }
+        item {
             Spacer(modifier = Modifier.height(24.dp))
             // খাত সম্পাদন ডায়ালগ
             if (editCatType != null) {
@@ -1426,6 +1600,18 @@ fun HomeScreen(
                     }
                 )
             }
+            if (showAutoDialog) {
+                AutoIncomeDialog(
+                    prefs = prefs,
+                    onDismiss = { showAutoDialog = false },
+                    onSave = { next ->
+                        saveAppPrefs(context, next)
+                        prefs = next
+                        scheduleAutoIncome(context)
+                        showAutoDialog = false
+                    }
+                )
+            }
         }
     }
 }
@@ -1441,8 +1627,7 @@ private fun JomaTotalCard(
     onLockClick: () -> Unit,
     expanded: Boolean,
     onExpandClick: () -> Unit,
-    todayAmount: String,
-    weekAmount: String,
+    expandedLines: List<String>,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -1493,7 +1678,7 @@ private fun JomaTotalCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ArrowDropDown,
+                        imageVector = if (expanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
                         contentDescription = null,
                         tint = GreyText,
                         modifier = Modifier.size(18.dp)
@@ -1502,16 +1687,14 @@ private fun JomaTotalCard(
             }
             if (expanded) {
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = tr("আজকে", "Today") + ": " + todayAmount,
-                    fontSize = 12.sp,
-                    color = GreyText
-                )
-                Text(
-                    text = tr("এই সপ্তাহে", "This week") + ": " + weekAmount,
-                    fontSize = 12.sp,
-                    color = GreyText
-                )
+                for ((index, line) in expandedLines.withIndex()) {
+                    Text(
+                        text = line,
+                        fontSize = 12.sp,
+                        fontWeight = if (index == 0) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (index == 0) Color.Black else GreyText
+                    )
+                }
             }
         }
     }
@@ -1916,5 +2099,370 @@ fun TransactionRow(item: Transaction, onDelete: () -> Unit) {
                 color = GreyText
             )
         }
+    }
+}
+
+// অটো আয় সেট ডায়ালগ (মাসিক ও দৈনিক) — জমা খরচের মতো।
+@Composable
+private fun AutoIncomeDialog(
+    prefs: AppPrefs,
+    onDismiss: () -> Unit,
+    onSave: (AppPrefs) -> Unit
+) {
+    val context = LocalContext.current
+    val incomeChips = listOf(
+        Triple("বেতন", "Salary", "💼"),
+        Triple("ব্যবসা", "Business", "🏢"),
+        Triple("পণ্য বিক্রি", "Product Sales", "📦"),
+        Triple("ভাড়া", "Rent", "🏠"),
+        Triple("সেবা আয়", "Service Income", "🔔"),
+        Triple("ভাতা", "Allowance", "🎗️"),
+        Triple("অনলাইন ইনকাম", "Online Income", "💻")
+    )
+    val dateChips = listOf(1, 5, 7, 10, 15, 20, 25, 30)
+
+    var monthlyAmount by remember { mutableStateOf(if (prefs.autoSalaryAmount > 0L) prefs.autoSalaryAmount.toString() else "0") }
+    var monthlyDay by remember { mutableStateOf(prefs.autoSalaryDay) }
+    var monthlyDayText by remember { mutableStateOf(prefs.autoSalaryDay.toString()) }
+    var monthlyCategory by remember { mutableStateOf(prefs.autoSalaryCategory) }
+    var monthlyCustomOpen by remember { mutableStateOf(false) }
+    var monthlyCustom by remember { mutableStateOf("") }
+    var monthlyEnabled by remember { mutableStateOf(prefs.autoSalaryEnabled) }
+
+    var dailyAmount by remember { mutableStateOf(if (prefs.autoDailyAmount > 0L) prefs.autoDailyAmount.toString() else "0") }
+    var dailyCategory by remember { mutableStateOf(prefs.autoDailyCategory) }
+    var dailyCustomOpen by remember { mutableStateOf(false) }
+    var dailyCustom by remember { mutableStateOf("") }
+    var dailyEnabled by remember { mutableStateOf(prefs.autoDailyEnabled) }
+
+    fun saveDialog() {
+        val mAmt = monthlyAmount.filter { it.isDigit() }.toLongOrNull() ?: 0L
+        val mDay = monthlyDayText.filter { it.isDigit() }.toIntOrNull()?.coerceIn(1, 31) ?: 1
+        val mCat = if (monthlyCustomOpen && monthlyCustom.isNotBlank()) monthlyCustom.trim() else monthlyCategory
+        val dAmt = dailyAmount.filter { it.isDigit() }.toLongOrNull() ?: 0L
+        val dCat = if (dailyCustomOpen && dailyCustom.isNotBlank()) dailyCustom.trim() else dailyCategory
+        val existing = loadCustomCategories(context, "আয়")
+        var next = existing
+        if (mCat !in allCategories(context, "আয়")) next = next + mCat
+        if (dCat !in allCategories(context, "আয়")) next = next + dCat
+        if (next != existing) saveCustomCategories(context, "আয়", next)
+        onSave(
+            prefs.copy(
+                autoSalaryEnabled = monthlyEnabled,
+                autoSalaryAmount = mAmt,
+                autoSalaryDay = mDay,
+                autoSalaryCategory = mCat,
+                autoDailyEnabled = dailyEnabled,
+                autoDailyAmount = dAmt,
+                autoDailyCategory = dCat
+            )
+        )
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "⚡ " + tr("অটো আয় সেট (মাসিক ও দৈনিক)", "Auto Income Set (Monthly & Daily)"),
+                        modifier = Modifier.weight(1f),
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = null, tint = GreyText)
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .background(GreenTint, RoundedCornerShape(16.dp))
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = "💼 " + tr("মাসিক বেতন / আয় সেট", "Monthly Salary / Income Set"),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GreenMain
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = tr("কত টাকা (৳)", "Amount (৳)"),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = monthlyAmount,
+                                onValueChange = { monthlyAmount = it.filter { ch -> ch.isDigit() }.take(9) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = tr("কত তারিখে (১–৩১)", "On which date (1–31)"),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = monthlyDayText,
+                                onValueChange = {
+                                    monthlyDayText = it.filter { ch -> ch.isDigit() }.take(2)
+                                    monthlyDayText.toIntOrNull()?.let { d -> monthlyDay = d.coerceIn(1, 31) }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = tr("তারিখ", "Date") + ":", fontSize = 13.sp, color = GreyText)
+                        for (d in dateChips) {
+                            val selected = monthlyDay == d
+                            Box(
+                                modifier = Modifier.size(38.dp)
+                                    .background(if (selected) GreenMain else Color.White, CircleShape)
+                                    .border(1.dp, if (selected) GreenMain else TrackGrey, CircleShape)
+                                    .clickable {
+                                        monthlyDay = d
+                                        monthlyDayText = d.toString()
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = toBengaliDigits(d.toString()),
+                                    fontSize = 14.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (selected) Color.White else Color.Black
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        for ((bn, en, icon) in incomeChips) {
+                            val selected = !monthlyCustomOpen && monthlyCategory == bn
+                            AutoCategoryChip(tr(bn, en), icon, selected) {
+                                monthlyCategory = bn
+                                monthlyCustomOpen = false
+                            }
+                        }
+                        AutoCategoryChip(
+                            "+ " + tr("অন্যান্য", "Others"),
+                            "＋",
+                            monthlyCustomOpen
+                        ) { monthlyCustomOpen = !monthlyCustomOpen }
+                    }
+                    if (monthlyCustomOpen) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = monthlyCustom,
+                            onValueChange = { monthlyCustom = it },
+                            label = { Text(text = tr("নতুন খাতের নাম", "New category name")) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .background(Color.White, RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = tr("উক্ত তারিখে অটো যোগ করুন", "Auto add on that date"),
+                            modifier = Modifier.weight(1f),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Switch(
+                            checked = monthlyEnabled,
+                            onCheckedChange = { monthlyEnabled = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = GreenMain,
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = TrackGrey
+                            )
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .background(GreyBg, RoundedCornerShape(16.dp))
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = "📅 " + tr("ব্যবসায়ীদের জন্য প্রতিদিনের আয় সেট", "Daily Income Set for Businesses"),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = tr("প্রতিদিনের আয় কত টাকা (৳)", "Daily income amount (৳)"),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = dailyAmount,
+                        onValueChange = { dailyAmount = it.filter { ch -> ch.isDigit() }.take(9) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        for ((bn, en, icon) in incomeChips) {
+                            val selected = !dailyCustomOpen && dailyCategory == bn
+                            AutoCategoryChip(tr(bn, en), icon, selected) {
+                                dailyCategory = bn
+                                dailyCustomOpen = false
+                            }
+                        }
+                        AutoCategoryChip(
+                            "+ " + tr("অন্যান্য", "Others"),
+                            "＋",
+                            dailyCustomOpen
+                        ) { dailyCustomOpen = !dailyCustomOpen }
+                    }
+                    if (dailyCustomOpen) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = dailyCustom,
+                            onValueChange = { dailyCustom = it },
+                            label = { Text(text = tr("নতুন খাতের নাম", "New category name")) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .background(Color.White, RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = tr("প্রতিদিন অটো যোগ করুন", "Auto add every day"),
+                            modifier = Modifier.weight(1f),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Switch(
+                            checked = dailyEnabled,
+                            onCheckedChange = { dailyEnabled = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = GreenMain,
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = TrackGrey
+                            )
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = GreyBg,
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        Text(text = tr("বাতিল", "Cancel"), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    Button(
+                        onClick = { saveDialog() },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = GreenMain)
+                    ) {
+                        Text(text = tr("সংরক্ষণ করুন", "Save"), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AutoCategoryChip(
+    label: String,
+    icon: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .background(if (selected) GreenMain else Color.White, RoundedCornerShape(20.dp))
+            .border(1.dp, if (selected) GreenMain else TrackGrey, RoundedCornerShape(20.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = icon, fontSize = 13.sp)
+        Text(
+            text = label,
+            modifier = Modifier.padding(start = 4.dp),
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = if (selected) Color.White else Color.Black
+        )
+    }
+}
+
+// কার্ড সাজান মোডে কার্ডের উপরে-নিচে সরানোর নীল গোল বোতাম।
+@Composable
+private fun MoveButton(
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier.size(40.dp).background(JomaBlue, CircleShape)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(22.dp)
+        )
     }
 }
