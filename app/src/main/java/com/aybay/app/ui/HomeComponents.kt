@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.sp
 // বড় ফাইল ভাগ করা হলে পুশ আবার চলে — এই নিয়ম ভবিষ্যতের সব আপডেটেও মানতে হবে।
 
 @Composable
-private fun QuickAddTile(
+fun QuickAddTile(
     emoji: String,
     label: String,
     bgColor: Color,
@@ -65,7 +65,7 @@ private fun QuickAddTile(
 }
 
 @Composable
-private fun AutoCategoryChip(
+fun AutoCategoryChip(
     label: String,
     icon: String,
     selected: Boolean,
