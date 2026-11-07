@@ -37,6 +37,7 @@ class AyBayViewModel(app: Application) : AndroidViewModel(app) {
         repo.categoryTotals(monthPrefix, type)
     fun transactionsOfMonth(monthPrefix: String) = repo.transactionsOfMonth(monthPrefix)
     fun budgetsOfMonth(monthKey: String) = repo.budgetsOfMonth(monthKey)
+    fun allBudgets() = repo.allBudgets()
 
     fun addTransaction(item: Transaction) {
         viewModelScope.launch {
