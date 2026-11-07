@@ -560,6 +560,7 @@ fun HomeScreen(
                             Row(
                                 modifier = Modifier
                                     .background(GreyBg, RoundedCornerShape(16.dp))
+                                    .clickable { chartMode = if (chartMode == "দৈনিক") "মাসিক" else "দৈনিক" }
                                     .padding(horizontal = 10.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
