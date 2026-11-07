@@ -28,8 +28,8 @@ fun loadAppPrefs(context: Context): AppPrefs {
         pin = prefs.getString("pin", "") ?: "",
         biometricEnabled = prefs.getBoolean("biometric_enabled", false),
         appPinEnabled = prefs.getBoolean("app_pin_enabled", false),
-        lockedSections = prefs.getString("locked_sections", "")
-            ?.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet() ?: emptySet(),
+        lockedSections = (prefs.getString("locked_sections", "") ?: "")
+            .split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
         autoSalaryEnabled = prefs.getBoolean("auto_salary_enabled", false),
         autoSalaryAmount = prefs.getLong("auto_salary_amount", 0L),
         autoSalaryDay = prefs.getInt("auto_salary_day", 1),
