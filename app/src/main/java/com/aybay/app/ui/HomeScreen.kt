@@ -145,25 +145,6 @@ private fun backupFileExists(): Boolean {
     }
 }
 
-private fun categoryIcon(category: String): String = when (category) {
-    "বাজার" -> "🛒"
-    "বিল" -> "🧾"
-    "খাবার" -> "🍲"
-    "যাতায়াত" -> "🚌"
-    "ধর্মীয় দান" -> "🤲"
-    "হাতখরচ" -> "💵"
-    "তেল/গ্যাস" -> "⛽"
-    "মার্কেট/শপিং" -> "🛍️"
-    "গাড়ি ভাড়া" -> "🚗"
-    "রেস্টুরেন্ট" -> "🍽️"
-    "বাসা ভাড়া" -> "🏠"
-    "দোকান ভাড়া" -> "🏪"
-    "বেতন", "মাসিক বেতন", "সাপ্তাহিক বেতন" -> "💼"
-    "দৈনিক মজুরি" -> "👷"
-    "সঞ্চয়" -> "🏺"
-    else -> "🏷️"
-}
-
 private fun accountKindLabel(kind: String): String = when (kind) {
     "ক্যাশ" -> tr("হাতে থাকা টাকা", "Cash in hand")
     "ব্যাংক" -> tr("ব্যাংক", "Bank")
@@ -198,8 +179,23 @@ fun HomeScreen(
     val shown = totalsOf(filterByPeriod(transactions, period, today))
     val shownTotal = shown.income + shown.expense + shown.savings
 
-    // মোট কার্ডের তালা আর ড্রপডাউন (কোন কার্ড লক/খোলা আছে)।
-    var lockedCards by remember { mutableStateOf(setOf<String>()) }
+    // মোট কার্ডের তালা: AppPrefs.lockedSections-এ সেভ থাকে (অ্যাপ বন্ধ করলেও থাকে)।
+    // SharedPreferences থেকে প্রতিবার নতুন করে পড়া হয়, যাতে সেটিংসের ডায়ালগে
+    // বদলানো লক হোমে ফিরেই দেখা যায়।
+    val lockedCards = loadAppPrefs(context).lockedSections
+        .filter { it == "আয়" || it == "ব্যয়" || it == "সঞ্চয়" }.toSet()
+    fun setSectionLocked(key: String, locked: Boolean) {
+        val now = loadAppPrefs(context)
+        val next = if (locked) now.lockedSections + key else now.lockedSections - key
+        val updated = now.copy(lockedSections = next)
+        saveAppPrefs(context, updated)
+        prefs = updated
+    }
+    // লক করা কার্ড খুলতে পিন ডায়ালগ: কোন কার্ড খোলা হচ্ছে ("আয়"/"ব্যয়"/"সঞ্চয়")।
+    var unlockCard by remember { mutableStateOf<String?>(null) }
+    // সার্চ লক: এই সেশনে একবার খুললে আর পিন চাইবে না।
+    var searchUnlocked by remember { mutableStateOf(false) }
+    var showSearchPin by remember { mutableStateOf(false) }
     // তালা চাপলে কনফার্ম পপআপ: কোন কার্ড লক করতে চাওয়া হচ্ছে ("আয়"/"ব্যয়"/"সঞ্চয়")।
     var lockConfirmCard by remember { mutableStateOf<String?>(null) }
     var expandedCards by remember { mutableStateOf(setOf<String>()) }
@@ -443,7 +439,7 @@ fun HomeScreen(
                     bgColor = GreenTint,
                     locked = "আয়" in lockedCards,
                     onLockClick = {
-                        if ("আয়" in lockedCards) lockedCards = lockedCards - "আয়" else lockConfirmCard = "আয়"
+                        if ("আয়" in lockedCards) unlockCard = "আয়" else lockConfirmCard = "আয়"
                     },
                     expanded = "আয়" in expandedCards,
                     onExpandClick = {
@@ -463,7 +459,7 @@ fun HomeScreen(
                     bgColor = RedTint,
                     locked = "ব্যয়" in lockedCards,
                     onLockClick = {
-                        if ("ব্যয়" in lockedCards) lockedCards = lockedCards - "ব্যয়" else lockConfirmCard = "ব্যয়"
+                        if ("ব্যয়" in lockedCards) unlockCard = "ব্যয়" else lockConfirmCard = "ব্যয়"
                     },
                     expanded = "ব্যয়" in expandedCards,
                     onExpandClick = {
@@ -483,7 +479,7 @@ fun HomeScreen(
                     bgColor = YellowTint,
                     locked = "সঞ্চয়" in lockedCards,
                     onLockClick = {
-                        if ("সঞ্চয়" in lockedCards) lockedCards = lockedCards - "সঞ্চয়" else lockConfirmCard = "সঞ্চয়"
+                        if ("সঞ্চয়" in lockedCards) unlockCard = "সঞ্চয়" else lockConfirmCard = "সঞ্চয়"
                     },
                     expanded = "সঞ্চয়" in expandedCards,
                     onExpandClick = {
@@ -1118,23 +1114,32 @@ fun HomeScreen(
                             )
                         }
                         Spacer(modifier = Modifier.height(10.dp))
-                        OutlinedTextField(
-                            value = ledgerQuery,
-                            onValueChange = { ledgerQuery = it },
-                            placeholder = {
-                                Text(text = tr("নাম বা খাত লিখে খুঁজুন...", "Search by name..."))
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = null,
-                                    tint = GreyText
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = ledgerQuery,
+                                onValueChange = { ledgerQuery = it },
+                                placeholder = {
+                                    Text(text = tr("নাম বা খাত লিখে খুঁজুন...", "Search by name..."))
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = GreyText
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            // সার্চ বার লক থাকলে ফিল্ডে ট্যাপ করলে আগে পিন চাইবে।
+                            if ("সার্চ" in loadAppPrefs(context).lockedSections && !searchUnlocked) {
+                                Box(
+                                    modifier = Modifier.matchParentSize()
+                                        .clickable { showSearchPin = true }
                                 )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp)
-                        )
+                            }
+                        }
                         Spacer(modifier = Modifier.height(10.dp))
                         if (ledgerShown.isEmpty()) {
                             EmptyState(
@@ -1685,7 +1690,7 @@ fun HomeScreen(
                         }
                         Button(
                             onClick = {
-                                lockedCards = lockedCards + confirmKey
+                                setSectionLocked(confirmKey, true)
                                 lockConfirmCard = null
                             },
                             modifier = Modifier.weight(1f),
@@ -1699,138 +1704,29 @@ fun HomeScreen(
             }
         }
     }
-}
-
-@Composable
-private fun JomaTotalCard(
-    title: String,
-    amount: String,
-    icon: ImageVector,
-    color: Color,
-    bgColor: Color,
-    locked: Boolean,
-    onLockClick: () -> Unit,
-    expanded: Boolean,
-    onExpandClick: () -> Unit,
-    expandedLines: List<String>,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(28.dp).background(Color.White, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = title,
-                        tint = color,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-                Text(
-                    text = title,
-                    modifier = Modifier.weight(1f).padding(start = 6.dp),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Icon(
-                    imageVector = if (locked) Icons.Default.Lock else Icons.Default.LockOpen,
-                    contentDescription = null,
-                    tint = GreyText,
-                    modifier = Modifier.size(16.dp).clickable { onLockClick() }
-                )
-            }
-            Text(
-                text = if (locked) "৳ ••••" else amount,
-                modifier = Modifier.padding(top = 8.dp),
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                Box(
-                    modifier = Modifier.size(26.dp).background(Color.White, CircleShape)
-                        .clickable { onExpandClick() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (expanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
-                        contentDescription = null,
-                        tint = GreyText,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-            if (expanded) {
-                Spacer(modifier = Modifier.height(4.dp))
-                for ((index, line) in expandedLines.withIndex()) {
-                    Text(
-                        text = line,
-                        fontSize = 12.sp,
-                        fontWeight = if (index == 0) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (index == 0) Color.Black else GreyText
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ChartTotalBox(
-    label: String,
-    amount: String,
-    bgColor: Color,
-    accent: Color
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(12.dp))
-            .padding(10.dp)
-    ) {
-        Text(text = label, fontSize = 12.sp, color = GreyText)
-        Text(
-            text = amount,
-            modifier = Modifier.padding(top = 2.dp),
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.Black
+    // লক করা কার্ড খুলতে পিন ডায়ালগ (তালা চাপলে আর সরাসরি আনলক হয় না)।
+    if (unlockCard != null) {
+        val unlockKey = unlockCard!!
+        PinUnlockDialog(
+            prefs = loadAppPrefs(context),
+            onPrefsChange = { next -> saveAppPrefs(context, next); prefs = next },
+            onUnlocked = {
+                setSectionLocked(unlockKey, false)
+                unlockCard = null
+            },
+            onDismiss = { unlockCard = null }
         )
     }
-}
-
-@Composable
-private fun FlowStatBox(
-    title: String,
-    value: String,
-    bgColor: Color,
-    accent: Color,
-    modifier: Modifier
-) {
-    Column(
-        modifier = modifier.background(bgColor, RoundedCornerShape(12.dp)).padding(10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = title,
-            fontSize = 12.sp,
-            color = GreyText,
-            textAlign = TextAlign.Center
-        )
-        Text(
-            text = value,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = accent,
-            textAlign = TextAlign.Center
+    // সার্চ বার লক খুলতে পিন ডায়ালগ।
+    if (showSearchPin) {
+        PinUnlockDialog(
+            prefs = loadAppPrefs(context),
+            onPrefsChange = { next -> saveAppPrefs(context, next); prefs = next },
+            onUnlocked = {
+                searchUnlocked = true
+                showSearchPin = false
+            },
+            onDismiss = { showSearchPin = false }
         )
     }
 }
@@ -1978,135 +1874,6 @@ private fun CategoryAnalysisCard(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun DueBox(
-    label: String,
-    amount: String,
-    bgColor: Color,
-    icon: String,
-    modifier: Modifier,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = icon, fontSize = 14.sp)
-                Text(
-                    text = label,
-                    modifier = Modifier.padding(start = 4.dp),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            Text(
-                text = amount,
-                modifier = Modifier.padding(top = 6.dp),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
-@Composable
-private fun LedgerStatBox(
-    title: String,
-    value: String,
-    modifier: Modifier,
-    sub: String = ""
-) {
-    Column(
-        modifier = modifier.background(GreyBg, RoundedCornerShape(12.dp)).padding(10.dp)
-    ) {
-        Text(text = title, fontSize = 12.sp, color = GreyText)
-        Text(
-            text = value,
-            modifier = Modifier.padding(top = 2.dp),
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold
-        )
-        if (sub.isNotBlank()) {
-            Text(text = sub, fontSize = 12.sp, color = GreyText)
-        }
-    }
-}
-
-@Composable
-private fun AccountRow(name: String, sub: String, balance: Long) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier.size(48.dp).background(GreyBg, RoundedCornerShape(12.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.AccountBalanceWallet,
-                contentDescription = null,
-                tint = GreenMain,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-        Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
-            Text(text = name, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Text(text = sub, fontSize = 12.sp, color = GreyText)
-        }
-        Text(
-            text = moneyText(balance),
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            color = GreenMain
-        )
-    }
-}
-
-@Composable
-private fun RecentTransactionRow(item: Transaction) {
-    val positive = item.type == "আয়"
-    val tint = when (item.type) {
-        "আয়" -> GreenTint
-        "ব্যয়" -> RedTint
-        else -> BlueTint
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier.size(48.dp).background(tint, RoundedCornerShape(12.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(text = categoryIcon(item.category), fontSize = 22.sp)
-        }
-        Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
-            Text(
-                text = categoryLabel(item.category) +
-                    if (item.note.isNotBlank()) " • " + item.note else "",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = fullDateLabel(item.date) + " • " + timeLabel(item.time),
-                fontSize = 12.sp,
-                color = GreyText
-            )
-        }
-        Text(
-            text = moneyTextSigned(item.amount, positive),
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            color = if (positive) GreenMain else RedMain
-        )
     }
 }
 
@@ -2466,21 +2233,3 @@ private fun AutoIncomeDialog(
 }
 
 // কার্ড সাজান মোডে কার্ডের উপরে-নিচে সরানোর নীল গোল বোতাম।
-@Composable
-private fun MoveButton(
-    icon: ImageVector,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier.size(40.dp).background(JomaBlue, CircleShape)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(22.dp)
-        )
-    }
-}
