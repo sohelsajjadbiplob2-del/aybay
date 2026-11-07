@@ -1,6 +1,7 @@
 package com.aybay.app.ui
 
 import android.app.DatePickerDialog
+import android.os.Environment
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
@@ -25,7 +26,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
@@ -38,10 +38,11 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -60,6 +61,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +77,7 @@ import androidx.compose.ui.window.Dialog
 import com.aybay.app.data.Totals
 import com.aybay.app.data.Transaction
 import com.aybay.app.data.scheduleAutoIncome
+import java.io.File
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -127,6 +130,19 @@ private fun groupByCategory(list: List<Transaction>, type: String): Map<String, 
 private fun percentOf(part: Long, total: Long): String {
     if (total <= 0L) return "০%"
     return toBengaliDigits((part * 100 / total).toString()) + "%"
+}
+
+// লোকাল ব্যাকআপ ফাইল (Downloads/আয়-ব্যয়/backup.json) আছে কি না।
+private fun backupFileExists(): Boolean {
+    return try {
+        val dir = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            "আয়-ব্যয়"
+        )
+        File(dir, "backup.json").exists()
+    } catch (e: Exception) {
+        false
+    }
 }
 
 private fun categoryIcon(category: String): String = when (category) {
@@ -185,6 +201,12 @@ fun HomeScreen(
     // মোট কার্ডের তালা আর ড্রপডাউন (কোন কার্ড লক/খোলা আছে)।
     var lockedCards by remember { mutableStateOf(setOf<String>()) }
     var expandedCards by remember { mutableStateOf(setOf<String>()) }
+
+    // ব্যালেন্স লুকানো/দেখানো (চোখের আইকন)।
+    var balanceHidden by rememberSaveable { mutableStateOf(false) }
+
+    // ডাটা ব্যাকআপ পিল: আসল backup.json থাকলেই done।
+    var backupDone by remember { mutableStateOf(backupFileExists()) }
 
     // কার্ড সাজান: সেকশনের ক্রম ফোনে সেভ থাকে, সব সেকশন সবসময় দেখায়।
     var arrangeMode by remember { mutableStateOf(false) }
@@ -319,14 +341,25 @@ fun HomeScreen(
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Text(
-                                    text = tr("বর্তমান হাতে নগদ", "Current Cash in Hand"),
+                                    text = tr("মোট ব্যালেন্স", "Total Balance"),
                                     modifier = Modifier.padding(start = 6.dp),
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold
                                 )
+                                IconButton(
+                                    onClick = { balanceHidden = !balanceHidden },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (balanceHidden) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = tr("ব্যালেন্স লুকান/দেখান", "Hide/show balance"),
+                                        tint = JomaBlue,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                             Text(
-                                text = moneyText(totalsAll.balance),
+                                text = if (balanceHidden) "৳ ••••••" else moneyText(totalsAll.balance),
                                 modifier = Modifier.padding(top = 6.dp),
                                 fontSize = 30.sp,
                                 fontWeight = FontWeight.Bold
@@ -337,26 +370,26 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(
                         modifier = Modifier
-                            .background(Color.White, RoundedCornerShape(20.dp))
+                            .background(
+                                if (backupDone) GreenMain else GreenTint,
+                                RoundedCornerShape(20.dp)
+                            )
+                            .clickable {
+                                val file = exportBackupJson(context, transactions)
+                                if (file != null) backupDone = true
+                            }
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier.size(8.dp)
-                                .background(
-                                    if (viewModel.sync.isAvailable) GreenMain else GreyText,
-                                    CircleShape
-                                )
-                        )
                         Text(
-                            text = if (viewModel.sync.isAvailable) {
-                                tr("লাইভ সিঙ্ক চালু", "Live Sync On")
+                            text = if (backupDone) {
+                                tr("📊 ডাটা ব্যাকআপ করা হয়েছে", "📊 Data backed up")
                             } else {
-                                tr("অফলাইন", "Offline")
+                                tr("📊 ডাটা ব্যাকআপ করুন", "📊 Back up data")
                             },
-                            modifier = Modifier.padding(start = 8.dp),
                             fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (backupDone) Color.White else GreenMain
                         )
                     }
                 }
@@ -510,10 +543,10 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        QuickAddTile(Icons.Default.Add, tr("আয়", "Income"), GreenMain, GreenTint, Modifier.weight(1f)) { onAdd("আয়") }
-                        QuickAddTile(Icons.Default.Remove, tr("ব্যয়", "Expense"), RedMain, RedTint, Modifier.weight(1f)) { onAdd("ব্যয়") }
-                        QuickAddTile(Icons.Default.Savings, tr("সঞ্চয়", "Savings"), OrangeMain, YellowTint, Modifier.weight(1f)) { onAdd("সঞ্চয়") }
-                        QuickAddTile(Icons.Default.SwapHoriz, tr("ট্রান্সফার", "Transfer"), PurpleMain, PurpleTint, Modifier.weight(1f)) { onAdd("ট্রান্সফার") }
+                        QuickAddTile("💵", tr("আয়", "Income"), GreenTint, Modifier.weight(1f)) { onAdd("আয়") }
+                        QuickAddTile("💸", tr("ব্যয়", "Expense"), RedTint, Modifier.weight(1f)) { onAdd("ব্যয়") }
+                        QuickAddTile("💰", tr("সঞ্চয়", "Savings"), YellowTint, Modifier.weight(1f)) { onAdd("সঞ্চয়") }
+                        QuickAddTile("🔄", tr("ট্রান্সফার", "Transfer"), PurpleTint, Modifier.weight(1f)) { onAdd("ট্রান্সফার") }
                     }
                 }
             }
@@ -564,11 +597,9 @@ fun HomeScreen(
                                     .padding(horizontal = 10.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.CalendarToday,
-                                    contentDescription = null,
-                                    tint = GreyText,
-                                    modifier = Modifier.size(14.dp)
+                                Text(
+                                    text = "📅",
+                                    fontSize = 14.sp
                                 )
                                 Text(
                                     text = if (chartMode == "দৈনিক") fullDateLabel(todayKey) else monthLabel(monthKey),
@@ -1668,9 +1699,8 @@ private fun JomaTotalCard(
 
 @Composable
 private fun QuickAddTile(
-    icon: ImageVector,
+    emoji: String,
     label: String,
-    color: Color,
     bgColor: Color,
     modifier: Modifier,
     onClick: () -> Unit
@@ -1690,11 +1720,9 @@ private fun QuickAddTile(
                 modifier = Modifier.size(38.dp).background(Color.White, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = color,
-                    modifier = Modifier.size(20.dp)
+                Text(
+                    text = emoji,
+                    fontSize = 20.sp
                 )
             }
             Text(
