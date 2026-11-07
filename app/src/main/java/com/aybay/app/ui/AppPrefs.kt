@@ -9,6 +9,8 @@ data class AppPrefs(
     val language: String = "bn",
     val pin: String = "",
     val biometricEnabled: Boolean = false,
+    val appPinEnabled: Boolean = false,
+    val lockedSections: Set<String> = emptySet(),
     val autoSalaryEnabled: Boolean = false,
     val autoSalaryAmount: Long = 0L,
     val autoSalaryDay: Int = 1,
@@ -25,6 +27,9 @@ fun loadAppPrefs(context: Context): AppPrefs {
         language = prefs.getString("language", "bn") ?: "bn",
         pin = prefs.getString("pin", "") ?: "",
         biometricEnabled = prefs.getBoolean("biometric_enabled", false),
+        appPinEnabled = prefs.getBoolean("app_pin_enabled", false),
+        lockedSections = prefs.getString("locked_sections", "")
+            ?.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet() ?: emptySet(),
         autoSalaryEnabled = prefs.getBoolean("auto_salary_enabled", false),
         autoSalaryAmount = prefs.getLong("auto_salary_amount", 0L),
         autoSalaryDay = prefs.getInt("auto_salary_day", 1),
@@ -41,6 +46,8 @@ fun saveAppPrefs(context: Context, prefs: AppPrefs) {
         .putString("language", prefs.language)
         .putString("pin", prefs.pin)
         .putBoolean("biometric_enabled", prefs.biometricEnabled)
+        .putBoolean("app_pin_enabled", prefs.appPinEnabled)
+        .putString("locked_sections", prefs.lockedSections.joinToString(","))
         .putBoolean("auto_salary_enabled", prefs.autoSalaryEnabled)
         .putLong("auto_salary_amount", prefs.autoSalaryAmount)
         .putInt("auto_salary_day", prefs.autoSalaryDay)
