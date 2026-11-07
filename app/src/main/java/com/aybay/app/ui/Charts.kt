@@ -2,23 +2,38 @@ package com.aybay.app.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -39,6 +54,18 @@ val PinkMain = Color(0xFFEC4899)
 val GreyText = Color(0xFF6B7280)
 val GreyBg = Color(0xFFF3F4F6)
 val TrackGrey = Color(0xFFE5E7EB)
+
+// জমা খরচের হোমের রং: পেজের হালকা নীলচে পটভূমি, নীল সিলেক্টেড ট্যাব,
+// হালকা নীল ব্যালেন্স কার্ড, কমলা সঞ্চয়, বেগুনি ট্রান্সফার।
+val JomaBlue = Color(0xFF2563EB)
+val PageBg = Color(0xFFF0F4FA)
+val LightBlueCard = Color(0xFFDBEAFE)
+val OrangeMain = Color(0xFFEA580C)
+val OrangeTint = Color(0xFFFED7AA)
+val PurpleTint = Color(0xFFEDE9FE)
+val PinkTint = Color(0xFFFCE7F3)
+val PinkDisc = Color(0xFFF9A8A8)
+val LightChartBg = Color(0xFFEFF6FF)
 
 // খাতের রং: ক্যাটাগরি ডোনাটে ঘুরিয়ে ব্যবহার হয়।
 val CategoryColors = listOf(RedMain, GreenMain, BlueMain, YellowMain, PurpleMain, PinkMain)
@@ -326,4 +353,298 @@ fun EmptyState(icon: String, text: String) {
 @Composable
 fun EmptyRow(text: String) {
     EmptyState(icon = "＋", text = text)
+}
+
+// ---------- জমা খরচের হোমের (V3) উপাদান ----------
+
+// সেকশনের শিরোনাম: রঙিন ডট + নাম + ডানে ঐচ্ছিক বোতাম/লিংক।
+@Composable
+fun JomaSectionHeader(
+    dotColor: Color,
+    title: String,
+    trailing: @Composable RowScope.() -> Unit = {}
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.size(10.dp).background(dotColor, CircleShape))
+        Text(
+            text = title,
+            modifier = Modifier.weight(1f).padding(start = 8.dp),
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold
+        )
+        trailing()
+    }
+}
+
+// ব্যালেন্স কার্ডের ডোনাট: হালকা গোলাপি চাকতি, উপরে ব্যয়ের অংশের লাল চাপ,
+// ভেতরে "ব্যয়" আর শতাংশ।
+@Composable
+fun ExpenseShareDonut(expense: Long, total: Long) {
+    val percent = if (total > 0L) (expense * 100 / total).toInt() else 0
+    Box(modifier = Modifier.size(118.dp), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.size(118.dp)) {
+            drawCircle(color = PinkDisc)
+            if (total > 0L && expense > 0L) {
+                val stroke = Stroke(width = 26f)
+                drawArc(
+                    color = RedMain,
+                    startAngle = -90f,
+                    sweepAngle = 360f * expense.toFloat() / total,
+                    useCenter = false,
+                    style = stroke
+                )
+            }
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = tr("ব্যয়", "Expense"),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = toBengaliDigits(percent.toString()) + "%",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+// এক রঙের রিং ডোনাট: খাত অনুযায়ী বিশ্লেষণ কার্ডে ব্যবহার হয়।
+// খালি থাকলে ধূসর রিং দেখায়।
+@Composable
+fun RingDonut(
+    color: Color,
+    top: String,
+    mid: String,
+    bottom: String
+) {
+    Box(modifier = Modifier.size(118.dp), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.size(118.dp)) {
+            val stroke = Stroke(width = 26f)
+            drawArc(
+                color = TrackGrey,
+                startAngle = 0f,
+                sweepAngle = 360f,
+                useCenter = false,
+                style = stroke
+            )
+            drawArc(
+                color = color,
+                startAngle = -90f,
+                sweepAngle = 360f,
+                useCenter = false,
+                style = stroke
+            )
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = top,
+                fontSize = 12.sp,
+                color = GreyText,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = mid,
+                fontSize = 12.sp,
+                color = GreyText,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = bottom,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+// আয়-ব্যয়ের দুইটা বড় বার: উপরে অঙ্ক, নিচে নাম।
+@Composable
+fun IncomeExpenseBars(income: Long, expense: Long) {
+    val max = maxOf(income, expense).coerceAtLeast(1L)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(LightChartBg, RoundedCornerShape(14.dp))
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        IncomeExpenseBar(
+            moneyText(income), income, max, GreenMain,
+            Icons.Default.ArrowUpward, tr("আয়", "Income")
+        )
+        IncomeExpenseBar(
+            moneyText(expense), expense, max, RedMain,
+            Icons.Default.ArrowDownward, tr("ব্যয়", "Expense")
+        )
+    }
+}
+
+@Composable
+private fun IncomeExpenseBar(
+    amount: String,
+    value: Long,
+    max: Long,
+    color: Color,
+    icon: ImageVector,
+    label: String
+) {
+    val frac = if (max > 0L) value.toFloat() / max else 0f
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = amount,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = color
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .width(72.dp)
+                .height((150f * frac).dp)
+                .background(
+                    color,
+                    RoundedCornerShape(
+                        topStart = 10.dp, topEnd = 10.dp,
+                        bottomStart = 4.dp, bottomEnd = 4.dp
+                    )
+                )
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = color,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text = label,
+                modifier = Modifier.padding(start = 2.dp),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+// আয় (সবুজ) / ব্যয় (লাল) অনুপাতে ভাগ করা প্রোগ্রেস বার।
+@Composable
+fun SplitProgressBar(income: Long, expense: Long) {
+    val total = income + expense
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(10.dp)
+            .background(TrackGrey, RoundedCornerShape(5.dp))
+    ) {
+        if (total > 0L) {
+            if (income > 0L) {
+                Box(
+                    modifier = Modifier
+                        .weight(income.toFloat())
+                        .fillMaxHeight()
+                        .background(
+                            GreenMain,
+                            RoundedCornerShape(topStart = 5.dp, bottomStart = 5.dp)
+                        )
+                )
+            }
+            if (expense > 0L) {
+                Box(
+                    modifier = Modifier
+                        .weight(expense.toFloat())
+                        .fillMaxHeight()
+                        .background(
+                            RedMain,
+                            RoundedCornerShape(topEnd = 5.dp, bottomEnd = 5.dp)
+                        )
+                )
+            }
+        }
+    }
+}
+
+// মাসের প্রতিদিনের ব্যয়ের লাইন চার্ট: দিনে ট্যাপ করলে ওই দিন সিলেক্ট হয়।
+@Composable
+fun FlowLineChart(
+    days: Int,
+    values: List<Long>,
+    selectedDay: Int,
+    onSelectDay: (Int) -> Unit
+) {
+    val max = (values.maxOrNull() ?: 0L).coerceAtLeast(1L)
+    val hasData = values.any { it > 0L }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(170.dp)
+            .pointerInput(days, values) {
+                detectTapGestures { offset ->
+                    val day = ((offset.x / size.width.toFloat()) * days)
+                        .toInt().coerceIn(0, days - 1) + 1
+                    onSelectDay(day)
+                }
+            }
+    ) {
+        Canvas(modifier = Modifier.fillMaxWidth().height(170.dp)) {
+            val w = size.width
+            val h = size.height
+            val padTop = 24f
+            val padBottom = 8f
+            val chartH = h - padTop - padBottom
+            val baseY = padTop + chartH
+            fun x(day: Int): Float =
+                if (days <= 1) w / 2f else (day - 1).toFloat() / (days - 1) * w
+            fun y(v: Long): Float = padTop + chartH * (1f - v.toFloat() / max)
+            drawLine(
+                color = Color(0xFF9CA3AF),
+                start = Offset(0f, baseY),
+                end = Offset(w, baseY),
+                strokeWidth = 2f,
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f)
+            )
+            if (hasData) {
+                val linePath = Path().apply {
+                    moveTo(x(1), y(values[0]))
+                    for (d in 2..days) lineTo(x(d), y(values[d - 1]))
+                }
+                val fillPath = Path().apply {
+                    addPath(linePath)
+                    lineTo(x(days), baseY)
+                    lineTo(x(1), baseY)
+                    close()
+                }
+                drawPath(fillPath, color = GreenMain.copy(alpha = 0.12f))
+                drawPath(linePath, color = GreenMain, style = Stroke(width = 5f))
+                val maxDay = values.indexOf(max) + 1
+                drawCircle(
+                    color = RedMain,
+                    radius = 12f,
+                    center = Offset(x(maxDay), y(max))
+                )
+                val sel = selectedDay.coerceIn(1, days)
+                drawCircle(
+                    color = Color.White,
+                    radius = 16f,
+                    center = Offset(x(sel), y(values[sel - 1]))
+                )
+                drawCircle(
+                    color = GreenMain,
+                    radius = 11f,
+                    center = Offset(x(sel), y(values[sel - 1]))
+                )
+            }
+        }
+    }
 }
