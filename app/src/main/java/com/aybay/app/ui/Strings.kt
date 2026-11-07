@@ -31,12 +31,14 @@ fun categoryLabel(category: String): String = when (category) {
     "দৈনিক মজুরি" -> tr("দৈনিক মজুরি", "Daily wage")
     "সাপ্তাহিক বেতন" -> tr("সাপ্তাহিক বেতন", "Weekly salary")
     "মাসিক বেতন" -> tr("মাসিক বেতন", "Monthly salary")
-    else -> tr("অন্যান্য", "Others")
+    "সঞ্চয়" -> tr("সঞ্চয়", "Savings")
+    "অন্যান্য" -> tr("অন্যান্য", "Others")
+    else -> category
 }
 
 fun periodLabel(period: String): String = when (period) {
     "সাপ্তাহিক" -> tr("সাপ্তাহিক", "Weekly")
     "মাসিক" -> tr("মাসিক", "Monthly")
-    "বার্ষিক" -> tr("বার্ষিক", "Yearly")
+    "বার্ষিক" -> tr("বাৎসরিক", "Yearly")
     else -> tr("দৈনিক", "Daily")
 }
