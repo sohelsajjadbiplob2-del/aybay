@@ -187,6 +187,51 @@ fun SettingsScreen(
                 fontSize = 14.sp,
                 color = GreyText
             )
+            SectionTitle(tr("অটো আয়", "Auto Income"))
+            var autoAmountText by remember { mutableStateOf(if (prefs.autoSalaryAmount > 0L) prefs.autoSalaryAmount.toString() else "") }
+            var autoDayText by remember { mutableStateOf(prefs.autoSalaryDay.toString()) }
+            Text(
+                text = tr("অটো আয়", "Auto income") + ": " +
+                    if (prefs.autoSalaryEnabled) tr("চালু", "On") else tr("বন্ধ", "Off"),
+                modifier = Modifier.clickable {
+                    onPrefsChange(prefs.copy(autoSalaryEnabled = !prefs.autoSalaryEnabled))
+                },
+                fontSize = 15.sp,
+                color = GreenDark
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = autoAmountText,
+                onValueChange = { v -> autoAmountText = v.filter { it.isDigit() } },
+                label = { Text(text = tr("মাসিক অটো আয়ের পরিমাণ", "Monthly auto income amount")) },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = autoDayText,
+                onValueChange = { v -> autoDayText = v.filter { it.isDigit() }.take(2) },
+                label = { Text(text = tr("মাসের কত তারিখ (১-২৮)", "Day of month (1-28)")) },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    val amt = autoAmountText.toLongOrNull() ?: 0L
+                    val day = (autoDayText.toIntOrNull() ?: 1).coerceIn(1, 28)
+                    onPrefsChange(prefs.copy(autoSalaryAmount = amt, autoSalaryDay = day))
+                    message = tr("অটো আয় সেট হয়েছে", "Auto income set")
+                },
+                enabled = (autoAmountText.toLongOrNull() ?: 0L) > 0L,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = GreenMain)
+            ) {
+                Text(text = tr("অটো আয় সংরক্ষণ করুন", "Save Auto Income"), fontSize = 15.sp)
+            }
             SectionTitle(tr("ব্যাকআপ", "Backup"))
             Button(
                 onClick = {
