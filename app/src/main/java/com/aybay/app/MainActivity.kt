@@ -38,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,6 +77,7 @@ import com.aybay.app.ui.SettingsScreen
 import com.aybay.app.ui.VoiceScreen
 import com.aybay.app.ui.VoiceText
 import com.aybay.app.ui.isEnglishPref
+import com.aybay.app.ui.LockedSectionGate
 import com.aybay.app.ui.loadAppPrefs
 import com.aybay.app.ui.parseBackupJson
 import com.aybay.app.ui.saveAppPrefs
@@ -92,11 +94,19 @@ class MainActivity : FragmentActivity() {
             viewModel.ensureDefaultAccount()
             var prefs by remember { mutableStateOf(loadAppPrefs(this)) }
             var unlocked by remember { mutableStateOf(false) }
-            val needsLock = prefs.pin.isNotBlank() && !unlocked
+            // অ্যাপস পিন টগল চালু থাকলেই চালুতে লক চাইবে (পিন সেট থাকলেও
+            // টগল বন্ধ থাকলে চাইবে না; পিন না থাকলে সেট করতে বলবে)।
+            val needsLock = prefs.appPinEnabled && !unlocked
             if (needsLock) {
                 LockScreen(
                     prefs = prefs,
                     onUnlocked = { unlocked = true },
+                    onPinSet = { pin ->
+                        val next = prefs.copy(pin = pin)
+                        prefs = next
+                        saveAppPrefs(this, next)
+                        unlocked = true
+                    },
                     activity = this
                 )
             } else {
@@ -121,6 +131,12 @@ fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPref
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val route = backStack?.destination?.route ?: "home"
+    // রিপোর্ট লক: এই সেশনে একবার খুললে আর পিন চাইবে না; রিপোর্ট থেকে
+    // বেরোলেই আবার লক হয়।
+    var reportUnlocked by remember { mutableStateOf(false) }
+    LaunchedEffect(route) {
+        if (route != "report") reportUnlocked = false
+    }
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
@@ -250,7 +266,17 @@ fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPref
                 }
                 composable("due") { DueScreen(viewModel = viewModel) }
                 composable("budget") { BudgetScreen(viewModel = viewModel) }
-                composable("report") { ReportScreen(viewModel = viewModel) }
+                composable("report") {
+                    if ("রিপোর্ট" in prefs.lockedSections && !reportUnlocked) {
+                        LockedSectionGate(
+                            prefs = prefs,
+                            onPrefsChange = onPrefsChange,
+                            onUnlocked = { reportUnlocked = true }
+                        )
+                    } else {
+                        ReportScreen(viewModel = viewModel)
+                    }
+                }
                 composable("notes") { NotesScreen(viewModel = viewModel) }
                 composable("voice") {
                     VoiceScreen(
@@ -276,7 +302,12 @@ fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPref
 }
 
 @Composable
-fun LockScreen(prefs: AppPrefs, onUnlocked: () -> Unit, activity: FragmentActivity) {
+fun LockScreen(
+    prefs: AppPrefs,
+    onUnlocked: () -> Unit,
+    onPinSet: (String) -> Unit,
+    activity: FragmentActivity
+) {
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
     Column(
@@ -287,56 +318,80 @@ fun LockScreen(prefs: AppPrefs, onUnlocked: () -> Unit, activity: FragmentActivi
         Text(text = "৳", fontSize = 48.sp, fontWeight = FontWeight.Bold, color = GreenDark)
         Text(text = tr("আয় - ব্যয়", "Ay - Bay"), fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(32.dp))
-        Text(text = tr("পিন দিন", "Enter PIN"), fontSize = 16.sp)
-        Spacer(modifier = Modifier.height(12.dp))
-        OutlinedTextField(
-            value = pin,
-            onValueChange = { v -> pin = v.filter { it.isDigit() }.take(6) },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true
-        )
-        if (error) {
-            Text(text = tr("ভুল পিন", "Wrong PIN"), color = Color.Red, modifier = Modifier.padding(top = 8.dp))
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(
-            onClick = {
-                if (pin == prefs.pin) onUnlocked() else error = true
-            },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
-        ) {
-            Text(text = tr("খুলুন", "Unlock"), fontSize = 16.sp)
-        }
-        if (prefs.biometricEnabled) {
+        if (prefs.pin.isBlank()) {
+            // অ্যাপস পিন চালু কিন্তু পিন সেট নেই: আগে পিন সেট করতে হবে।
+            Text(text = tr("পিন সেট করুন", "Set a PIN"), fontSize = 16.sp)
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(
+                value = pin,
+                onValueChange = { v -> pin = v.filter { it.isDigit() }.take(6) },
+                label = { Text(text = tr("৪-৬ সংখ্যার পিন", "4-6 digit PIN")) },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = { if (pin.length >= 4) onPinSet(pin) },
+                enabled = pin.length >= 4,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
+            ) {
+                Text(text = tr("সংরক্ষণ করুন", "Save"), fontSize = 16.sp)
+            }
+        } else {
+            Text(text = tr("পিন দিন", "Enter PIN"), fontSize = 16.sp)
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(
+                value = pin,
+                onValueChange = { v -> pin = v.filter { it.isDigit() }.take(6) },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true
+            )
+            if (error) {
+                Text(text = tr("ভুল পিন", "Wrong PIN"), color = Color.Red, modifier = Modifier.padding(top = 8.dp))
+            }
             Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = {
-                    val executor = ContextCompat.getMainExecutor(activity)
-                    val prompt = BiometricPrompt(
-                        activity,
-                        executor,
-                        object : BiometricPrompt.AuthenticationCallback() {
-                            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                                onUnlocked()
-                            }
-                        }
-                    )
-                    val info = BiometricPrompt.PromptInfo.Builder()
-                        .setTitle(tr("আয় - ব্যয়", "Ay - Bay"))
-                        .setSubtitle(tr("ফিঙ্গারপ্রিন্ট দিন", "Use fingerprint"))
-                        .setNegativeButtonText(tr("বাতিল", "Cancel"))
-                        .build()
-                    prompt.authenticate(info)
+                    if (pin == prefs.pin) onUnlocked() else error = true
                 },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
             ) {
-                Icon(imageVector = Icons.Default.Fingerprint, contentDescription = null)
-                Text(text = " " + tr("ফিঙ্গারপ্রিন্ট", "Fingerprint"), fontSize = 16.sp)
+                Text(text = tr("খুলুন", "Unlock"), fontSize = 16.sp)
+            }
+            if (prefs.biometricEnabled) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = {
+                        val executor = ContextCompat.getMainExecutor(activity)
+                        val prompt = BiometricPrompt(
+                            activity,
+                            executor,
+                            object : BiometricPrompt.AuthenticationCallback() {
+                                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                                    onUnlocked()
+                                }
+                            }
+                        )
+                        val info = BiometricPrompt.PromptInfo.Builder()
+                            .setTitle(tr("আয় - ব্যয়", "Ay - Bay"))
+                            .setSubtitle(tr("ফিঙ্গারপ্রিন্ট দিন", "Use fingerprint"))
+                            .setNegativeButtonText(tr("বাতিল", "Cancel"))
+                            .build()
+                        prompt.authenticate(info)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
+                ) {
+                    Icon(imageVector = Icons.Default.Fingerprint, contentDescription = null)
+                    Text(text = " " + tr("ফিঙ্গারপ্রিন্ট", "Fingerprint"), fontSize = 16.sp)
+                }
             }
         }
     }
