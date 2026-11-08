@@ -11,7 +11,18 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Update
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
+
+// V1 → V2: লেনদেনে রিসাইকেল বিন (deletedAt) আর সঞ্চয়ের দিক (direction) যোগ।
+// পুরনো ডেটা থাকে — শুধু দুটো কলাম যোগ হয়, ডিফল্ট 0 / ফাঁকা।
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE transactions ADD COLUMN deletedAt INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE transactions ADD COLUMN direction TEXT NOT NULL DEFAULT ''")
+    }
+}
 
 // ---------- লেনদেন ----------
 @Entity(tableName = "transactions")
@@ -26,7 +37,12 @@ data class Transaction(
     val note: String = "",
     val payer: String = "",
     val synced: Boolean = false,
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    // রিসাইকেল বিন: 0 = মোছা হয়নি; মোছা হলে মোছার সময় (মিলিসেকেন্ড)।
+    val deletedAt: Long = 0L,
+    // সঞ্চয়ের দিক: "জমা" (টাকা ঢোকানো) / "উত্তোলন" (টাকা তোলা)।
+    // অন্য ধরনে ফাঁকা থাকে; পুরনো সঞ্চয় লেনদেন ফাঁকা = জমা।
+    val direction: String = ""
 )
 
 @Entity(tableName = "due_items")
@@ -70,14 +86,22 @@ data class Account(
 
 @Dao
 interface AyBayDao {
-    @Query("SELECT * FROM transactions ORDER BY date DESC, id DESC")
+    @Query("SELECT * FROM transactions WHERE deletedAt = 0 ORDER BY date DESC, id DESC")
     fun allTransactions(): Flow<List<Transaction>>
 
-    @Query("SELECT * FROM transactions WHERE date LIKE :monthPrefix || '%' ORDER BY date DESC, id DESC")
+    @Query("SELECT * FROM transactions WHERE deletedAt = 0 AND date LIKE :monthPrefix || '%' ORDER BY date DESC, id DESC")
     fun transactionsOfMonth(monthPrefix: String): Flow<List<Transaction>>
 
-    @Query("SELECT * FROM transactions WHERE synced = 0")
+    @Query("SELECT * FROM transactions WHERE deletedAt = 0 AND synced = 0")
     suspend fun unsyncedTransactions(): List<Transaction>
+
+    // রিসাইকেল বিনের হিসাব (মোছা লেনদেন), নতুন মোছা আগে।
+    @Query("SELECT * FROM transactions WHERE deletedAt != 0 ORDER BY deletedAt DESC, id DESC")
+    fun deletedTransactions(): Flow<List<Transaction>>
+
+    // ৩ দিনের বেশি পুরনো মোছা হিসাব চিরতরে মুছে ফেলা।
+    @Query("DELETE FROM transactions WHERE deletedAt != 0 AND deletedAt < :olderThan")
+    suspend fun purgeDeleted(olderThan: Long)
 
     @Insert
     suspend fun insertTransaction(item: Transaction): Long
@@ -139,7 +163,7 @@ interface AyBayDao {
 
 @Database(
     entities = [Transaction::class, DueItem::class, Budget::class, Note::class, Account::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -155,7 +179,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "aybay.db"
-                ).build()
+                ).addMigrations(MIGRATION_1_2).build()
                 INSTANCE = instance
                 instance
             }
