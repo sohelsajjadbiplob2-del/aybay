@@ -60,22 +60,6 @@ private val JOMA_SAVINGS_TYPES = listOf(
     "ব্যাংক", "মোবাইল ব্যাংকিং", "ব্যাংক (ডিপিএস, ...)", "ফান্ড", "সোনা বা মূল্যবান...", "মাটির ব্যাংক"
 )
 
-// ফরমের ব্যানারের গাঢ় নেভি রং (জমার সতর্ক/সফলতার ব্যানারের মতো)।
-private val NavyBanner = Color(0xFF0F2B46)
-
-// সংরক্ষণের পর দেখানো সফলতার ব্যানারের তথ্য (সংরক্ষণের আগের মান সহ)।
-private data class SavedInfo(
-    val type: String,
-    val displayCat: String,
-    val amount: Long,
-    val totalBefore: Long,
-    val totalAfter: Long,
-    val accountLabel: String,
-    val accountBefore: Long,
-    val accountAfter: Long,
-    val isWithdraw: Boolean
-)
-
 private fun rateTypeLabel(rateType: String): String = when (rateType) {
     "মাসিক" -> tr("মাসিক", "Monthly")
     else -> tr("বার্ষিক", "Yearly")
@@ -173,7 +157,6 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
     var payerName by remember { mutableStateOf("") }
     var payerAddress by remember { mutableStateOf("") }
     var payerMobile by remember { mutableStateOf("") }
-    var savedInfo by remember { mutableStateOf<SavedInfo?>(null) }
     // সঞ্চয় ফর্ম: জমা/উত্তোলন, মুনাফা, ব্যাংক/প্রতিষ্ঠানের তথ্য, পিন ডায়ালগ।
     var prefs by remember { mutableStateOf(loadAppPrefs(context)) }
     var savingsDirection by remember { mutableStateOf("জমা") }
@@ -302,180 +285,6 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            // সফলতার ব্যানার (সংরক্ষণের পর) নইলে খাত না বাছা থাকলে সতর্ক-ব্যানার।
-            if (savedInfo != null) {
-                val info = savedInfo!!
-                val pillColor = if (info.type == "ব্যয়" || info.isWithdraw) RedMain else GreenMain
-                Box(
-                    modifier = Modifier.fillMaxWidth()
-                        .background(NavyBanner, RoundedCornerShape(14.dp))
-                        .padding(14.dp)
-                ) {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier.size(34.dp)
-                                    .background(GreenMain, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "✓",
-                                    color = Color.White,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
-                                Text(
-                                    text = when {
-                                        info.type == "আয়" -> tr("আয় যোগ হয়েছে", "Income added")
-                                        info.type == "ব্যয়" -> tr("ব্যয় যোগ হয়েছে", "Expense added")
-                                        info.isWithdraw -> tr("সঞ্চয় উত্তোলন হয়েছে", "Savings withdrawn")
-                                        else -> tr("সঞ্চয় যোগ হয়েছে", "Savings added")
-                                    },
-                                    color = Color.White,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = info.displayCat + " • " + moneyText(info.amount),
-                                    color = Color.White.copy(alpha = 0.85f),
-                                    fontSize = 13.sp
-                                )
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .border(1.dp, pillColor, RoundedCornerShape(16.dp))
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = when {
-                                        info.type == "আয়" -> "+ " + moneyText(info.amount) + " " + tr("(যোগ হলো)", "(added)")
-                                        info.type == "ব্যয়" -> "+ " + moneyText(info.amount) + " " + tr("(ব্যয়ে যোগ হলো)", "(added to expense)")
-                                        info.isWithdraw -> "− " + moneyText(info.amount) + " " + tr("(উত্তোলন হলো)", "(withdrawn)")
-                                        else -> "+ " + moneyText(info.amount) + " " + tr("(যোগ হলো)", "(added)")
-                                    },
-                                    color = pillColor,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Box(
-                            modifier = Modifier.fillMaxWidth()
-                                .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
-                                .padding(12.dp)
-                        ) {
-                            Column {
-                                Row(modifier = Modifier.fillMaxWidth()) {
-                                    Text(
-                                        text = when (info.type) {
-                                            "আয়" -> tr("মোট আয়:", "Total Income:")
-                                            "ব্যয়" -> tr("মোট ব্যয়:", "Total Expense:")
-                                            else -> tr("মোট সঞ্চয়:", "Total Savings:")
-                                        },
-                                        color = Color.White,
-                                        fontSize = 14.sp
-                                    )
-                                    Spacer(modifier = Modifier.weight(1f))
-                                    Text(
-                                        text = moneyText(info.totalAfter),
-                                        color = pillColor,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row {
-                                    Text(text = moneyText(info.totalBefore), color = Color.White, fontSize = 13.sp)
-                                    Text(text = if (info.isWithdraw) " − " else " + ", color = Color.White, fontSize = 13.sp)
-                                    Text(
-                                        text = moneyText(info.amount),
-                                        color = if (info.isWithdraw) RedMain else GreenMain,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(text = " = ", color = Color.White, fontSize = 13.sp)
-                                    Text(text = moneyText(info.totalAfter), color = Color.White, fontSize = 13.sp)
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = info.accountLabel + " " + when {
-                                    info.type == "আয়" -> tr("(যোগ হলো):", "(added):")
-                                    info.type == "ব্যয়" -> tr("(বিয়োগ হলো):", "(deducted):")
-                                    info.isWithdraw -> tr("(উত্তোলন হলো):", "(withdrawn):")
-                                    else -> tr("(যোগ হলো):", "(added):")
-                                },
-                                color = Color.White,
-                                fontSize = 13.sp
-                            )
-                            Spacer(modifier = Modifier.weight(1f))
-                            Row {
-                                Text(text = moneyText(info.accountBefore), color = pillColor, fontSize = 13.sp)
-                                Text(
-                                    text = if (info.type == "ব্যয়" || info.isWithdraw) " − " else " + ",
-                                    color = pillColor,
-                                    fontSize = 13.sp
-                                )
-                                Text(text = moneyText(info.amount), color = pillColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Text(text = " = ", color = pillColor, fontSize = 13.sp)
-                                Text(text = moneyText(info.accountAfter), color = pillColor, fontSize = 13.sp)
-                            }
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(14.dp))
-            } else if (category.isBlank()) {
-                Box(
-                    modifier = Modifier.fillMaxWidth()
-                        .background(NavyBanner, RoundedCornerShape(14.dp))
-                        .padding(14.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier.size(34.dp)
-                                .border(2.dp, OrangeMain, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "!",
-                                color = OrangeMain,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Text(
-                            text = when (type) {
-                                "আয়" -> tr(
-                                    "পরিমাণ লেখার আগে অনুগ্রহ করে উপরে একটি আয়ের খাত নির্বাচন করুন",
-                                    "Please select an income category above before entering the amount"
-                                )
-                                "ব্যয়" -> tr(
-                                    "পরিমাণ লেখার আগে অনুগ্রহ করে উপরে একটি ব্যয়ের খাত নির্বাচন করুন",
-                                    "Please select an expense category above before entering the amount"
-                                )
-                                else -> tr(
-                                    "পরিমাণ লেখার আগে অনুগ্রহ করে উপরে একটি সঞ্চয়ের খাত নির্বাচন করুন",
-                                    "Please select a savings category above before entering the amount"
-                                )
-                            },
-                            modifier = Modifier.weight(1f).padding(start = 10.dp),
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(14.dp))
-            }
             // ধরনের পিল
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -504,7 +313,6 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                                 type = t
                                 category = ""
                                 subcat = ""
-                                savedInfo = null
                                 if (t == "সঞ্চয়") {
                                     // সঞ্চয় ফর্মে অ্যাকাউন্ট বাছাই নেই — সবসময় হাতে নগদ থেকে।
                                     account = "হাতে নগদ"
@@ -618,7 +426,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                                 JomaBlue,
                                 RoundedCornerShape(24.dp)
                             )
-                            .clickable { savingsDirection = "জমা"; savedInfo = null }
+                            .clickable { savingsDirection = "জমা" }
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -642,7 +450,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                                 GreenMain,
                                 RoundedCornerShape(24.dp)
                             )
-                            .clickable { savingsDirection = "উত্তোলন"; savedInfo = null }
+                            .clickable { savingsDirection = "উত্তোলন" }
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -688,7 +496,6 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                                         } else {
                                             category = item.name
                                             subcat = ""
-                                            savedInfo = null
                                         }
                                     }
                                     .padding(vertical = 10.dp),
@@ -817,7 +624,6 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                                         showNewSubcatDialog = true
                                     } else {
                                         subcat = sub
-                                        savedInfo = null
                                     }
                                 }
                                 .padding(horizontal = 14.dp, vertical = 8.dp),
@@ -964,10 +770,16 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
+                // খাত না বাছা থাকলে ঘরটায় চাপ দিলে সতর্ক-ব্যানার আসে (ঘর disabled থাকে)।
+                Box(
+                    modifier = Modifier.weight(1f)
+                        .clickable(enabled = category.isBlank()) { viewModel.showWarningBanner(type) },
+                    contentAlignment = Alignment.CenterStart
+                ) {
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { v -> amountText = v.filter { it.isDigit() }.take(9) },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     enabled = category.isNotBlank(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -984,6 +796,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                     },
                     shape = RoundedCornerShape(12.dp)
                 )
+                }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "🧮",
@@ -1357,10 +1170,12 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                     val extraParts = if (type == "সঞ্চয়") savingsParts else payerParts
                     val finalNote = if (extraParts.isEmpty()) note
                     else (if (note.isBlank()) "" else note + "\n") + extraParts.joinToString(", ")
-                    // সফলতার ব্যানারের হিসাবের জন্য সংরক্ষণের আগের মান (addTransaction-এর আগেই)।
-                    val displayCat =
-                        if (subcat.isNotBlank() && subcat != "অন্যান্য") "$category ($subcat)"
-                        else category
+                    // ব্যানারে খাতের নাম: আয়ে শুধু মূল খাত; ব্যয়ে উপখাত থাকলে "মূল (উপখাত)"; সঞ্চয়ে ধরনের নাম।
+                    val displayCat = when (finalType) {
+                        "আয়" -> category
+                        "ব্যয়" -> if (subcat.isNotBlank() && subcat != "অন্যান্য") "$category ($subcat)" else category
+                        else -> category
+                    }
                     val isWithdraw = finalType == "সঞ্চয়" && savingsDirection == "উত্তোলন"
                     val totalBefore = when (finalType) {
                         "আয়" -> transactions.filter { it.type == "আয়" }.sumOf { it.amount }
@@ -1399,7 +1214,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                             direction = if (type == "সঞ্চয়") savingsDirection else ""
                         )
                     )
-                    savedInfo = SavedInfo(
+                    viewModel.showSavedBanner(SavedInfo(
                         type = finalType,
                         displayCat = displayCat,
                         amount = amount,
@@ -1409,7 +1224,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                         accountBefore = accBefore,
                         accountAfter = accAfter,
                         isWithdraw = isWithdraw
-                    )
+                    ))
                     // জমার মতো ফরম খোলা থাকে, ব্যানার দেখায় — হোমে ফেরে না।
                     // পরের লেনদেনের জন্য খাত/উপখাত/পরিমাণ খালি করে দিই।
                     category = ""
@@ -1479,7 +1294,6 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                         renameCustomCategory(context, type, old, name)
                         if (category == old) {
                             category = name
-                            savedInfo = null
                         }
                         catsTick++
                     } else if (name.isNotBlank()) {
@@ -1491,7 +1305,6 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                         if (name in baseCats || name in customCatMap) {
                             category = name
                             subcat = ""
-                            savedInfo = null
                         } else {
                             pendingCatName = name
                             iconInitial = "✨"
@@ -1519,7 +1332,6 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                         saveCustomCategory(context, type, pendingCatName, icon)
                         category = pendingCatName
                         subcat = ""
-                        savedInfo = null
                         pendingCatName = ""
                     }
                     catsTick++
