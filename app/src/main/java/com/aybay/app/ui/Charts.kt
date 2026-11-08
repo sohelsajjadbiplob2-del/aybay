@@ -2,6 +2,7 @@ package com.aybay.app.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -663,12 +664,13 @@ fun SplitProgressBar(income: Long, expense: Long) {
     }
 }
 
-// মাসের প্রতিদিনের ব্যয়ের লাইন চার্ট: দিনে ট্যাপ করলে ওই দিন সিলেক্ট হয়।
+// মাসের প্রতিদিনের ব্যয়ের লাইন চার্ট: দিনে ট্যাপ বা স্লাইড করলে ওই দিন সিলেক্ট হয়।
 @Composable
 fun FlowLineChart(
     days: Int,
     values: List<Long>,
     selectedDay: Int,
+    avg: Long,
     onSelectDay: (Int) -> Unit
 ) {
     val max = (values.maxOrNull() ?: 0L).coerceAtLeast(1L)
@@ -684,6 +686,13 @@ fun FlowLineChart(
                     onSelectDay(day)
                 }
             }
+            .pointerInput(days, values) {
+                detectHorizontalDragGestures { change, _ ->
+                    val day = ((change.position.x / size.width.toFloat()) * days)
+                        .toInt().coerceIn(0, days - 1) + 1
+                    onSelectDay(day)
+                }
+            }
     ) {
         Canvas(modifier = Modifier.fillMaxWidth().height(170.dp)) {
             val w = size.width
@@ -695,13 +704,24 @@ fun FlowLineChart(
             fun x(day: Int): Float =
                 if (days <= 1) w / 2f else (day - 1).toFloat() / (days - 1) * w
             fun y(v: Long): Float = padTop + chartH * (1f - v.toFloat() / max)
+            // বেসলাইন (অক্ষের রেখা): হালকা নিরেট ধূসর।
             drawLine(
-                color = Color(0xFF9CA3AF),
+                color = Color(0xFFE5E7EB),
                 start = Offset(0f, baseY),
                 end = Offset(w, baseY),
-                strokeWidth = 2f,
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f)
+                strokeWidth = 2f
             )
+            // গড়ের ড্যাশ-লাইন (গড় ০ হলে আঁকে না — বেসলাইনের উপর পড়ত)।
+            if (avg > 0L) {
+                val avgY = y(avg.coerceAtMost(max))
+                drawLine(
+                    color = Color(0xFF9CA3AF),
+                    start = Offset(0f, avgY),
+                    end = Offset(w, avgY),
+                    strokeWidth = 2f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f)
+                )
+            }
             if (hasData) {
                 val linePath = Path().apply {
                     moveTo(x(1), y(values[0]))
@@ -717,11 +737,25 @@ fun FlowLineChart(
                 drawPath(linePath, color = GreenMain, style = Stroke(width = 5f))
                 val maxDay = values.indexOf(max) + 1
                 drawCircle(
-                    color = RedMain,
+                    color = GreenMain,
                     radius = 12f,
                     center = Offset(x(maxDay), y(max))
                 )
                 val sel = selectedDay.coerceIn(1, days)
+                // বাছাই করা দিনে খাড়া গাইড-লাইন (ডটেড) + X-অক্ষে ছোট টিক।
+                drawLine(
+                    color = Color(0xFF9CA3AF),
+                    start = Offset(x(sel), y(values[sel - 1])),
+                    end = Offset(x(sel), padTop),
+                    strokeWidth = 2f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f), 0f)
+                )
+                drawLine(
+                    color = GreenMain,
+                    start = Offset(x(sel), baseY - 8f),
+                    end = Offset(x(sel), baseY + 8f),
+                    strokeWidth = 5f
+                )
                 drawCircle(
                     color = Color.White,
                     radius = 16f,
