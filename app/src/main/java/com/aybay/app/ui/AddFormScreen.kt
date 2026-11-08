@@ -771,9 +771,11 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 // খাত না বাছা থাকলে ঘরটায় চাপ দিলে সতর্ক-ব্যানার আসে (ঘর disabled থাকে)।
+                // clickable শুধু খাত খালি থাকলেই যোগ করা হয় — খাত বাছা থাকলে clickable
+                // একদম থাকে না, নইলে বাবার clickable ঘরের চাপ আটকে দেয় (১.২০-এর বাগ)।
                 Box(
                     modifier = Modifier.weight(1f)
-                        .clickable(enabled = category.isBlank()) { viewModel.showWarningBanner(type) },
+                        .then(if (category.isBlank()) Modifier.clickable { viewModel.showWarningBanner(type) } else Modifier),
                     contentAlignment = Alignment.CenterStart
                 ) {
                 OutlinedTextField(
