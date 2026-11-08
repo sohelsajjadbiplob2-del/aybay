@@ -1,6 +1,9 @@
 package com.aybay.app.ui
 
 import android.app.Application
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aybay.app.data.AppDatabase
@@ -33,6 +36,40 @@ class AyBayViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val deletedTransactions: StateFlow<List<Transaction>> = repo.deletedTransactions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // ব্যানার (জমার মতো অস্থায়ী ওভারলে): সতর্ক ~২s, সফলতা ~৪.৫s।
+    // Tick বদলালে MainActivity-র টাইমার নতুন করে শুরু হয় (আবার চাপ দিলে রিস্টার্ট)।
+    var warningVisible by mutableStateOf(false)
+        private set
+    var warningType by mutableStateOf("আয়")
+        private set
+    var warningTick by mutableStateOf(0)
+        private set
+    var savedBanner by mutableStateOf<SavedInfo?>(null)
+        private set
+    var savedTick by mutableStateOf(0)
+        private set
+
+    fun showWarningBanner(type: String) {
+        savedBanner = null
+        warningType = type
+        warningVisible = true
+        warningTick++
+    }
+
+    fun dismissWarning() {
+        warningVisible = false
+    }
+
+    fun showSavedBanner(info: SavedInfo) {
+        warningVisible = false
+        savedBanner = info
+        savedTick++
+    }
+
+    fun dismissSavedBanner() {
+        savedBanner = null
+    }
 
     init {
         // অ্যাপ চালুতে ৩ দিনের বেশি পুরনো মোছা হিসাব চিরতরে মুছে যায়।
