@@ -31,6 +31,13 @@ class AyBayViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val accounts: StateFlow<List<Account>> = repo.accounts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val deletedTransactions: StateFlow<List<Transaction>> = repo.deletedTransactions()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    init {
+        // অ্যাপ চালুতে ৩ দিনের বেশি পুরনো মোছা হিসাব চিরতরে মুছে যায়।
+        viewModelScope.launch { repo.purgeExpiredDeleted() }
+    }
 
     fun totalsOfMonth(monthPrefix: String) = repo.totalsOfMonth(monthPrefix)
     fun categoryTotals(monthPrefix: String, type: String) =
@@ -49,8 +56,17 @@ class AyBayViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // মুছে ফেলা = রিসাইকেল বিনে যাওয়া (চিরতরে মোছে না)।
     fun deleteTransaction(item: Transaction) {
-        viewModelScope.launch { repo.deleteTransaction(item) }
+        viewModelScope.launch { repo.softDeleteTransaction(item) }
+    }
+
+    fun restoreTransaction(item: Transaction) {
+        viewModelScope.launch { repo.restoreTransaction(item) }
+    }
+
+    fun deleteTransactionPermanently(item: Transaction) {
+        viewModelScope.launch { repo.deleteTransactionPermanently(item) }
     }
 
     fun addDueItem(item: DueItem) {
