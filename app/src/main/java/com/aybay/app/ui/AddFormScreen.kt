@@ -25,6 +25,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -53,6 +55,21 @@ private val JOMA_INCOME_CATS = listOf(
     "বেতন", "ব্যবসা", "পণ্য বিক্রি", "ভাড়া", "সেবা আয়", "ভাতা", "অনলাইন ইনকাম", "অন্যান্য"
 )
 
+// জমা খরচের সঞ্চয়ের ধরন (হুবহু); অন্যান্য সঞ্চয় টাইলে নতুন ধরন যোগ হয়।
+private val JOMA_SAVINGS_TYPES = listOf(
+    "ব্যাংক", "মোবাইল ব্যাংকিং", "ব্যাংক (ডিপিএস, ...)", "ফান্ড", "সোনা বা মূল্যবান...", "মাটির ব্যাংক"
+)
+
+private fun rateTypeLabel(rateType: String): String = when (rateType) {
+    "মাসিক" -> tr("মাসিক", "Monthly")
+    else -> tr("বার্ষিক", "Yearly")
+}
+
+private fun interestMethodLabel(method: String): String = when (method) {
+    "চক্রবৃদ্ধি" -> tr("চক্রবৃদ্ধি মুনাফা (Compound Interest)", "Compound Interest")
+    else -> tr("সরল মুনাফা (Simple Interest)", "Simple Interest")
+}
+
 private fun formTileLabel(cat: String): String = when (cat) {
     "বেতন" -> tr("বেতন", "Salary")
     "ব্যবসা" -> tr("ব্যবসা", "Business")
@@ -61,6 +78,13 @@ private fun formTileLabel(cat: String): String = when (cat) {
     "সেবা আয়" -> tr("সেবা আয়", "Service Income")
     "ভাতা" -> tr("ভাতা", "Allowance")
     "অনলাইন ইনকাম" -> tr("অনলাইন ইনকাম", "Online Income")
+    "ব্যাংক" -> tr("ব্যাংক", "Bank")
+    "মোবাইল ব্যাংকিং" -> tr("মোবাইল ব্যাংকিং", "Mobile Banking")
+    "ব্যাংক (ডিপিএস, ...)" -> tr("ব্যাংক (ডিপিএস, ...)", "Bank (DPS, ...)")
+    "ফান্ড" -> tr("ফান্ড", "Fund")
+    "সোনা বা মূল্যবান..." -> tr("সোনা বা মূল্যবান...", "Gold or valuables...")
+    "মাটির ব্যাংক" -> tr("মাটির ব্যাংক", "Clay bank")
+    "অন্যান্য সঞ্চয়" -> tr("অন্যান্য সঞ্চয়", "Other savings")
     else -> categoryLabel(cat)
 }
 
@@ -74,6 +98,12 @@ private fun formTileIcon(cat: String): String = when (cat) {
     "অনলাইন ইনকাম" -> "💻"
     "অন্যান্য" -> "➕"
     "সঞ্চয়" -> "🏺"
+    "ব্যাংক", "ব্যাংক (ডিপিএস, ...)" -> "🏦"
+    "মোবাইল ব্যাংকিং" -> "📱"
+    "ফান্ড" -> "📈"
+    "সোনা বা মূল্যবান..." -> "🎖️"
+    "মাটির ব্যাংক" -> "🏺"
+    "অন্যান্য সঞ্চয়" -> "➕"
     "বাজার" -> "🛒"
     "বিল" -> "🧾"
     "খাবার" -> "🍲"
@@ -128,6 +158,19 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
     var payerAddress by remember { mutableStateOf("") }
     var payerMobile by remember { mutableStateOf("") }
     var saved by remember { mutableStateOf(false) }
+    // সঞ্চয় ফর্ম: জমা/উত্তোলন, মুনাফা, ব্যাংক/প্রতিষ্ঠানের তথ্য, পিন ডায়ালগ।
+    var prefs by remember { mutableStateOf(loadAppPrefs(context)) }
+    var savingsDirection by remember { mutableStateOf("জমা") }
+    var showPinDialog by remember { mutableStateOf(false) }
+    var profitRate by remember { mutableStateOf("") }
+    var rateType by remember { mutableStateOf("বার্ষিক") }
+    var interestMethod by remember { mutableStateOf("সরল") }
+    var showBankInfo by remember { mutableStateOf(true) }
+    var bankName by remember { mutableStateOf("") }
+    var bankAddress by remember { mutableStateOf("") }
+    var bankMobile by remember { mutableStateOf("") }
+    var rateTypeMenu by remember { mutableStateOf(false) }
+    var methodMenu by remember { mutableStateOf(false) }
     val accounts by viewModel.accounts.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
 
@@ -147,6 +190,8 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
         transactions.filter { it.account == "হাতে নগদ" }.sumOf {
             when (it.type) {
                 "আয়" -> it.amount
+                // সঞ্চয়ে জমা দিলে নগদ কমে, তুললে নগদ বাড়ে।
+                "সঞ্চয়" -> if (it.direction == "উত্তোলন") it.amount else -it.amount
                 else -> -it.amount
             }
         }
@@ -165,7 +210,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
         val baseCats = when (type) {
             "আয়" -> JOMA_INCOME_CATS
             "ব্যয়" -> expenseCategories
-            else -> listOf("সঞ্চয়", "অন্যান্য")
+            else -> JOMA_SAVINGS_TYPES
         }
         val base = baseCats.filter { it != "অন্যান্য" && it != "অন্যান্য ব্যয়" }
         val customs = customCatMap.entries
@@ -218,6 +263,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                 )
                 for ((t, color, icon) in typePills) {
                     val selected = type == t
+                    val pillIcon = if (t == "সঞ্চয়" && selected) "🏺✓" else icon
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -233,12 +279,17 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                                 type = t
                                 category = ""
                                 subcat = ""
+                                if (t == "সঞ্চয়") {
+                                    // সঞ্চয় ফর্মে অ্যাকাউন্ট বাছাই নেই — সবসময় হাতে নগদ থেকে।
+                                    account = "হাতে নগদ"
+                                    accountExpanded = false
+                                }
                             }
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = icon + " " + tr(
+                            text = pillIcon + " " + tr(
                                 t,
                                 if (t == "আয়") "Income" else if (t == "ব্যয়") "Expense" else "Savings"
                             ),
@@ -297,14 +348,89 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                     text = when (type) {
                         "আয়" -> tr("আয়ের খাত নির্বাচন করুন", "Choose an income category")
                         "ব্যয়" -> tr("ব্যয়ের খাত নির্বাচন করুন", "Choose an expense category")
-                        else -> tr("সঞ্চয়ের খাত নির্বাচন করুন", "Choose a savings category")
+                        else -> tr("সঞ্চয়ের ধরন নির্বাচন করুন", "Choose a savings type")
                     },
-                    modifier = Modifier.padding(start = 6.dp),
+                    modifier = Modifier.weight(1f).padding(start = 6.dp),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
+                if (type == "সঞ্চয়") {
+                    Box(
+                        modifier = Modifier
+                            .background(LightChartBg, RoundedCornerShape(20.dp))
+                            .border(1.dp, BlueTint, RoundedCornerShape(20.dp))
+                            .clickable { showPinDialog = true }
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "🔐 " + tr("পিন ও গোপনীয়তা", "PIN & Privacy"),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = JomaBlue
+                        )
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(10.dp))
+            // জমা / উত্তোলন (শুধু সঞ্চয়ে): জমা বাড়ায়, উত্তোলন কমায়।
+            if (type == "সঞ্চয়") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val depositSelected = savingsDirection == "জমা"
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(
+                                if (depositSelected) JomaBlue else Color.White,
+                                RoundedCornerShape(24.dp)
+                            )
+                            .border(
+                                2.dp,
+                                JomaBlue,
+                                RoundedCornerShape(24.dp)
+                            )
+                            .clickable { savingsDirection = "জমা" }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = (if (depositSelected) "✓ " else "") + "⬆️ " +
+                                tr("জমা করুন", "Deposit"),
+                            color = if (depositSelected) Color.White else JomaBlue,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(
+                                if (!depositSelected) GreenMain else Color.White,
+                                RoundedCornerShape(24.dp)
+                            )
+                            .border(
+                                2.dp,
+                                GreenMain,
+                                RoundedCornerShape(24.dp)
+                            )
+                            .clickable { savingsDirection = "উত্তোলন" }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = (if (!depositSelected) "✓ " else "") + "⬇️ " +
+                                tr("উত্তোলন করুন", "Withdraw"),
+                            color = if (!depositSelected) Color.White else GreenMain,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+            }
             val tileBgs = listOf(BlueTint, PinkTint, GreenTint, PurpleTint)
             for ((rowIndex, row) in formCatItems.chunked(4).withIndex()) {
                 Row(
@@ -317,7 +443,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(88.dp)
+                                .height(if (type == "সঞ্চয়") 104.dp else 88.dp)
                         ) {
                             Column(
                                 modifier = Modifier
@@ -345,13 +471,37 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                                 Text(text = item.icon, fontSize = 28.sp)
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = if (item.name == "অন্যান্য" && type == "ব্যয়") tr("অন্যান্য ব্যয়", "Other Expenses")
-                                        else formTileLabel(item.name),
+                                    text = when {
+                                        item.name == "অন্যান্য" && type == "ব্যয়" ->
+                                            tr("অন্যান্য ব্যয়", "Other Expenses")
+                                        item.name == "অন্যান্য" && type == "সঞ্চয়" ->
+                                            tr("অন্যান্য সঞ্চয়", "Other savings")
+                                        else -> formTileLabel(item.name)
+                                    },
                                     fontSize = 12.sp,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                                     textAlign = TextAlign.Center,
                                     maxLines = 2
                                 )
+                                // সঞ্চয়ে প্রতিটি ধরনের বর্তমান জমা (জমা − উত্তোলন) দেখায়।
+                                if (type == "সঞ্চয়") {
+                                    Text(
+                                        text = if (item.name == "অন্যান্য") {
+                                            tr("নতুন যোগ", "Add new")
+                                        } else {
+                                            moneyText(
+                                                transactions
+                                                    .filter { it.type == "সঞ্চয়" && it.category == item.name }
+                                                    .sumOf {
+                                                        if (it.direction == "উত্তোলন") -it.amount
+                                                        else it.amount
+                                                    }
+                                            )
+                                        },
+                                        fontSize = 11.sp,
+                                        color = GreyText
+                                    )
+                                }
                             }
                             if (selected) {
                                 Box(
@@ -398,8 +548,8 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            // উপখাত
-            if (category.isNotBlank()) {
+            // উপখাত (সঞ্চয়ে উপখাত নেই)
+            if (category.isNotBlank() && type != "সঞ্চয়") {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = tr("উপখাত", "Sub-category"),
@@ -447,7 +597,8 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                 }
             }
             Spacer(modifier = Modifier.height(6.dp))
-            // টাকা কোথায়
+            // টাকা কোথায় (সঞ্চয়ে ধরনই ঠিকানা — এই অংশ লুকানো থাকে)
+            if (type != "সঞ্চয়") {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -551,6 +702,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                     }
                 }
             }
+            }
             Spacer(modifier = Modifier.height(16.dp))
             // পরিমাণ
             Text(
@@ -584,8 +736,12 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     placeholder = {
                         Text(
-                            text = if (category.isBlank()) tr("আগে উপরে খাত বাছুন", "Pick a category above first")
-                                else "0.00",
+                            text = if (category.isBlank()) {
+                                if (type == "সঞ্চয়") tr(
+                                    "আগে উপরে সঞ্চয়ের ধরন বাছুন",
+                                    "Pick a savings type above first"
+                                ) else tr("আগে উপরে খাত বাছুন", "Pick a category above first")
+                            } else "0.00",
                             color = GreyText
                         )
                     },
@@ -609,7 +765,10 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (type == "ব্যয়") tr("তারিখ ও সময়, নোট, গ্রহণকারী তথ্য", "Date & time, note, receiver info")
+                    text = if (type == "সঞ্চয়") tr(
+                        "তারিখ ও সময়, নোট, ব্যাংক/প্রতিষ্ঠানের তথ্য",
+                        "Date & time, note, bank/institution info"
+                    ) else if (type == "ব্যয়") tr("তারিখ ও সময়, নোট, গ্রহণকারী তথ্য", "Date & time, note, receiver info")
                         else tr("তারিখ ও সময়, নোট, প্রদানকারী তথ্য", "Date & time, note, payer info"),
                     modifier = Modifier.weight(1f),
                     fontSize = 14.sp,
@@ -704,7 +863,156 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
+                // সঞ্চয়ের মুনাফা আর ব্যাংক/প্রতিষ্ঠানের তথ্য (জমার মতো)।
+                if (type == "সঞ্চয়") {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = tr("মুনাফার হার % (ঐচ্ছিক)", "Profit rate % (optional)"),
+                                fontSize = 13.sp,
+                                color = GreyText
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = profitRate,
+                                onValueChange = { profitRate = it.filter { ch -> ch.isDigit() || ch == '.' }.take(5) },
+                                placeholder = { Text(text = tr("যেমন: ৬", "e.g. 6"), color = GreyText) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = tr("হার প্রকার", "Rate type"),
+                                fontSize = 13.sp,
+                                color = GreyText
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Box {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color.White, RoundedCornerShape(12.dp))
+                                        .border(1.dp, TrackGrey, RoundedCornerShape(12.dp))
+                                        .clickable { rateTypeMenu = true }
+                                        .padding(12.dp)
+                                ) {
+                                    Text(text = rateTypeLabel(rateType), fontSize = 14.sp)
+                                }
+                                DropdownMenu(
+                                    expanded = rateTypeMenu,
+                                    onDismissRequest = { rateTypeMenu = false }
+                                ) {
+                                    for (rt in listOf("বার্ষিক", "মাসিক")) {
+                                        DropdownMenuItem(
+                                            text = { Text(text = rateTypeLabel(rt)) },
+                                            onClick = { rateType = rt; rateTypeMenu = false }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = tr("মুনাফা হিসাবের পদ্ধতি", "Interest calculation method"),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White, RoundedCornerShape(12.dp))
+                                .border(1.dp, TrackGrey, RoundedCornerShape(12.dp))
+                                .clickable { methodMenu = true }
+                                .padding(12.dp)
+                        ) {
+                            Text(text = interestMethodLabel(interestMethod), fontSize = 14.sp)
+                        }
+                        DropdownMenu(
+                            expanded = methodMenu,
+                            onDismissRequest = { methodMenu = false }
+                        ) {
+                            for (m in listOf("সরল", "চক্রবৃদ্ধি")) {
+                                DropdownMenuItem(
+                                    text = { Text(text = interestMethodLabel(m)) },
+                                    onClick = { interestMethod = m; methodMenu = false }
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(GreyBg, RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "👤 " + tr("ব্যাংক/প্রতিষ্ঠানের তথ্য যোগ করুন", "Add bank/institution info"),
+                            modifier = Modifier.weight(1f),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Switch(
+                            checked = showBankInfo,
+                            onCheckedChange = { showBankInfo = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = GreenMain,
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = TrackGrey
+                            )
+                        )
+                    }
+                    if (showBankInfo) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(text = tr("নাম", "Name"), fontSize = 13.sp, color = GreyText)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = bankName,
+                            onValueChange = { bankName = it },
+                            placeholder = { Text(text = tr("নাম লিখুন", "Write name"), color = GreyText) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(text = tr("ঠিকানা", "Address"), fontSize = 13.sp, color = GreyText)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = bankAddress,
+                            onValueChange = { bankAddress = it },
+                            placeholder = { Text(text = tr("ঠিকানা লিখুন", "Write address"), color = GreyText) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(text = tr("মোবাইল নম্বর", "Mobile number"), fontSize = 13.sp, color = GreyText)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = bankMobile,
+                            onValueChange = { bankMobile = it.filter { ch -> ch.isDigit() }.take(11) },
+                            placeholder = { Text(text = "০১XXXXXXXXX", color = GreyText) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(10.dp))
+                if (type != "সঞ্চয়") {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -730,7 +1038,8 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                         )
                     )
                 }
-                if (showPayer) {
+                }
+                if (showPayer && type != "সঞ্চয়") {
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(text = tr("নাম", "Name"), fontSize = 13.sp, color = GreyText)
                     Spacer(modifier = Modifier.height(4.dp))
@@ -781,8 +1090,36 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                         payerMobile.trim().takeIf { it.isNotBlank() }
                             ?.let { tr("মোবাইল", "Mobile") + ": " + it }
                     )
-                    val finalNote = if (payerParts.isEmpty()) note
-                    else (if (note.isBlank()) "" else note + "\n") + payerParts.joinToString(", ")
+                    // সঞ্চয়ের মুনাফা আর ব্যাংক/প্রতিষ্ঠানের তথ্য নোটে জোড়া হয়।
+                    val savingsParts = mutableListOf<String>()
+                    if (type == "সঞ্চয়") {
+                        if (profitRate.isNotBlank()) {
+                            savingsParts.add(
+                                tr("মুনাফার হার", "Profit rate") + ": " + profitRate + "% " +
+                                    rateTypeLabel(rateType) + " (" +
+                                    interestMethodLabel(interestMethod) + ")"
+                            )
+                        }
+                        if (showBankInfo) {
+                            val bankParts = listOfNotNull(
+                                bankName.trim().takeIf { it.isNotBlank() }
+                                    ?.let { tr("নাম", "Name") + ": " + it },
+                                bankAddress.trim().takeIf { it.isNotBlank() }
+                                    ?.let { tr("ঠিকানা", "Address") + ": " + it },
+                                bankMobile.trim().takeIf { it.isNotBlank() }
+                                    ?.let { tr("মোবাইল", "Mobile") + ": " + it }
+                            )
+                            if (bankParts.isNotEmpty()) {
+                                savingsParts.add(
+                                    tr("ব্যাংক/প্রতিষ্ঠান", "Bank/Institution") + ": " +
+                                        bankParts.joinToString(", ")
+                                )
+                            }
+                        }
+                    }
+                    val extraParts = if (type == "সঞ্চয়") savingsParts else payerParts
+                    val finalNote = if (extraParts.isEmpty()) note
+                    else (if (note.isBlank()) "" else note + "\n") + extraParts.joinToString(", ")
                     viewModel.addTransaction(
                         Transaction(
                             type = finalType,
@@ -792,7 +1129,8 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                             date = dateKey,
                             time = time24,
                             note = finalNote,
-                            payer = payerName.trim()
+                            payer = if (type == "সঞ্চয়") "" else payerName.trim(),
+                            direction = if (type == "সঞ্চয়") savingsDirection else ""
                         )
                     )
                     saved = true
@@ -802,8 +1140,8 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = mainColor,
-                    contentColor = onMainColor
+                    containerColor = if (type == "সঞ্চয়") BrownMain else mainColor,
+                    contentColor = if (type == "সঞ্চয়") Color.White else onMainColor
                 )
             ) {
                 Text(
@@ -873,7 +1211,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                         val baseCats = when (type) {
                             "আয়" -> JOMA_INCOME_CATS
                             "ব্যয়" -> expenseCategories
-                            else -> listOf("সঞ্চয়", "অন্যান্য")
+                            else -> JOMA_SAVINGS_TYPES
                         }
                         if (name in baseCats || name in customCatMap) {
                             category = name
@@ -961,6 +1299,14 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                     amountText = result
                     showCalc = false
                 }
+            )
+        }
+        // সঞ্চয় ফর্মের "পিন ও গোপনীয়তা" বোতামের ডায়ালগ (রুটে থাকে)।
+        if (showPinDialog) {
+            PinPrivacyDialog(
+                prefs = prefs,
+                onPrefsChange = { next -> saveAppPrefs(context, next); prefs = next },
+                onDismiss = { showPinDialog = false }
             )
         }
     }
