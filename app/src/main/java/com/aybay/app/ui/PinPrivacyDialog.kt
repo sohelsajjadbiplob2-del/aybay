@@ -307,14 +307,67 @@ fun SecurityRecoveryDialog(
     }
 }
 
+// নিশ্চিতকরণ ডায়ালগ — জমার মতো: শুধু বার্তা, বোতাম বাতিল (হালকা) / ঠিক আছে (নীল)।
+@Composable
+fun ConfirmDialog(
+    message: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+                Text(
+                    text = message,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = GreyBg,
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        Text(text = tr("বাতিল", "Cancel"), fontSize = 15.sp)
+                    }
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = JomaBlue)
+                    ) {
+                        Text(text = tr("ঠিক আছে", "OK"), fontSize = 15.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
 // লক করা অংশ খুলতে পিন/বায়োমেট্রিক ডায়ালগ। পিন সেট না থাকলে
 // আগে পিন সেট করতে বলে পিন-সেট ডায়ালগ দেখায়।
+// title দিলে সেই শিরোনাম দেখায় (ডিফল্ট "পিন দিন"); onRecoveryCorrect
+// দিলে "পিন ভুলে গেছেন?"-এ সঠিক উত্তর দিলে নতুন পিন না চেয়ে সেটাই ডাকে
+// (পিন মোছার ফ্লোতে ব্যবহৃত হয়)।
 @Composable
 fun PinUnlockDialog(
     prefs: AppPrefs,
     onPrefsChange: (AppPrefs) -> Unit,
     onUnlocked: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    title: String? = null,
+    onRecoveryCorrect: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val activity = context as? FragmentActivity
@@ -350,7 +403,7 @@ fun PinUnlockDialog(
                     Text(text = "🔒", fontSize = 36.sp)
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = tr("পিন দিন", "Enter PIN"),
+                        text = title ?: tr("পিন দিন", "Enter PIN"),
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -422,7 +475,10 @@ fun PinUnlockDialog(
     if (showRecovery) {
         SecurityRecoveryDialog(
             prefs = prefs,
-            onCorrect = { showRecovery = false; showNewPin = true },
+            onCorrect = {
+                showRecovery = false
+                if (onRecoveryCorrect != null) onRecoveryCorrect() else showNewPin = true
+            },
             onDismiss = { showRecovery = false }
         )
     }
@@ -461,6 +517,9 @@ fun PinPrivacyDialog(
     val context = LocalContext.current
     var showPinSet by remember { mutableStateOf(false) }
     var showSecurityQ by remember { mutableStateOf(false) }
+    var showDeletePin by remember { mutableStateOf(false) }
+    var showDeletePinConfirm by remember { mutableStateOf(false) }
+    var showDeleteSecurityQ by remember { mutableStateOf(false) }
     var pendingSection by remember { mutableStateOf<String?>(null) }
     var pendingAppPin by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
@@ -544,29 +603,63 @@ fun PinPrivacyDialog(
                         text = if (prefs.pin.isBlank()) {
                             tr("🔒 পিন সেট করুন", "Set PIN")
                         } else {
-                            tr("🔒 পিন বদলান", "Change PIN")
+                            tr("🔒 পিন পরিবর্তন", "Change PIN")
                         },
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
                 if (prefs.pin.isNotBlank()) {
-                    Text(
-                        text = tr("পিন মুছে ফেলুন", "Remove PIN"),
-                        modifier = Modifier.padding(top = 8.dp).clickable {
-                            onPrefsChange(
-                                prefs.copy(
-                                    pin = "",
-                                    appPinEnabled = false,
-                                    lockedSections = emptySet(),
-                                    securityQuestion = "",
-                                    securityAnswer = ""
-                                )
-                            )
-                        },
-                        fontSize = 14.sp,
-                        color = RedMain
-                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { showDeletePin = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = GreyBg,
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        Text(
+                            text = tr("🗑️ পিন মুছুন", "Delete PIN"),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+                if (prefs.securityQuestion.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { showSecurityQ = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = GreyBg,
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        Text(
+                            text = tr("❓ সিকিউরিটি প্রশ্ন পরিবর্তন", "Change security question"),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { showDeleteSecurityQ = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = GreyBg,
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        Text(
+                            text = tr("🗑️ সিকিউরিটি প্রশ্ন মুছুন", "Delete security question"),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 LockToggleRow(
@@ -663,6 +756,60 @@ fun PinPrivacyDialog(
             prefs = prefs,
             onPrefsChange = onPrefsChange,
             onDismiss = { showSecurityQ = false }
+        )
+    }
+    if (showDeletePin) {
+        PinUnlockDialog(
+            prefs = prefs,
+            title = tr("পিন মুছতে বর্তমান পিন দিন:", "Enter your current PIN to delete it:"),
+            onPrefsChange = onPrefsChange,
+            onUnlocked = { showDeletePin = false; showDeletePinConfirm = true },
+            onDismiss = { showDeletePin = false },
+            onRecoveryCorrect = { showDeletePin = false; showDeletePinConfirm = true }
+        )
+    }
+    if (showDeletePinConfirm) {
+        ConfirmDialog(
+            message = tr(
+                "আপনি কি নিশ্চিত পিন ও সিকিউরিটি প্রশ্ন সম্পূর্ণ মুছে ফেলতে চান? সতর্কতা: সুরক্ষিত থাকবে না।",
+                "Are you sure you want to completely delete the PIN and security question? Warning: it will no longer be protected."
+            ),
+            onConfirm = {
+                onPrefsChange(
+                    prefs.copy(
+                        pin = "",
+                        appPinEnabled = false,
+                        lockedSections = emptySet(),
+                        securityQuestion = "",
+                        securityAnswer = ""
+                    )
+                )
+                Toast.makeText(
+                    context,
+                    tr("পিন মুছে ফেলা হয়েছে", "PIN deleted"),
+                    Toast.LENGTH_SHORT
+                ).show()
+                showDeletePinConfirm = false
+            },
+            onDismiss = { showDeletePinConfirm = false }
+        )
+    }
+    if (showDeleteSecurityQ) {
+        ConfirmDialog(
+            message = tr(
+                "আপনি কি নিশ্চিত সিকিউরিটি প্রশ্ন মুছে ফেলতে চান?",
+                "Are you sure you want to delete the security question?"
+            ),
+            onConfirm = {
+                onPrefsChange(prefs.copy(securityQuestion = "", securityAnswer = ""))
+                Toast.makeText(
+                    context,
+                    tr("সিকিউরিটি প্রশ্ন মুছে ফেলা হয়েছে", "Security question deleted"),
+                    Toast.LENGTH_SHORT
+                ).show()
+                showDeleteSecurityQ = false
+            },
+            onDismiss = { showDeleteSecurityQ = false }
         )
     }
 }
