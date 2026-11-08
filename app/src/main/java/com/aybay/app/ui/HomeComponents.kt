@@ -126,6 +126,7 @@ fun categoryIcon(category: String): String = when (category) {
     "বেতন", "মাসিক বেতন", "সাপ্তাহিক বেতন" -> "💼"
     "দৈনিক মজুরি" -> "👷"
     "সঞ্চয়" -> "🏺"
+    "ট্রান্সফার" -> "🔁"
     "ব্যাংক", "ব্যাংক (ডিপিএস, ...)" -> "🏦"
     "মোবাইল ব্যাংকিং" -> "📱"
     "ফান্ড" -> "📈"
@@ -364,11 +365,14 @@ fun AccountRow(name: String, sub: String, balance: Long) {
 @Composable
 fun RecentTransactionRow(item: Transaction) {
     // জমা সঞ্চয় আয়ের মতো সবুজ + চিহ্ন; উত্তোলন ব্যয়ের মতো লাল − চিহ্ন।
+    // ট্রান্সফার আয়-ব্যয় নয় — চিহ্ন ছাড়া নীল অঙ্ক দেখায়।
+    val isTransfer = item.type == "ট্রান্সফার"
     val positive = item.type == "আয়" ||
         (item.type == "সঞ্চয়" && item.direction != "উত্তোলন")
     val tint = when (item.type) {
         "আয়" -> GreenTint
         "ব্যয়" -> RedTint
+        "ট্রান্সফার" -> PurpleTint
         else -> BlueTint
     }
     Row(
@@ -383,8 +387,15 @@ fun RecentTransactionRow(item: Transaction) {
         }
         Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
             Text(
-                text = categoryLabel(item.category) +
-                    if (item.note.isNotBlank()) " • " + item.note else "",
+                text = if (isTransfer) {
+                    tr("ট্রান্সফার", "Transfer") + ": " +
+                        transferDisplayLabel(item.account) + " → " +
+                        transferDisplayLabel(item.payer) +
+                        if (item.note.isNotBlank()) " • " + item.note else ""
+                } else {
+                    categoryLabel(item.category) +
+                        if (item.note.isNotBlank()) " • " + item.note else ""
+                },
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold
             )
@@ -395,10 +406,10 @@ fun RecentTransactionRow(item: Transaction) {
             )
         }
         Text(
-            text = moneyTextSigned(item.amount, positive),
+            text = if (isTransfer) moneyText(item.amount) else moneyTextSigned(item.amount, positive),
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
-            color = if (positive) GreenMain else RedMain
+            color = if (isTransfer) JomaBlue else if (positive) GreenMain else RedMain
         )
     }
 }
@@ -419,5 +430,67 @@ fun MoveButton(
             tint = Color.White,
             modifier = Modifier.size(22.dp)
         )
+    }
+}
+
+// লেনদেনের সারি (লেজার/রিপোর্ট পাতায় ব্যবহৃত) — HomeScreen.kt থেকে সরানো,
+// কারণ HomeScreen.kt পুশের argv সীমা (131072 বাইট) ছাড়িয়ে গিয়েছিল।
+@Composable
+fun TransactionRow(item: Transaction, onDelete: () -> Unit) {
+    // জমা সঞ্চয় সবুজ + চিহ্ন; উত্তোলন লাল − চিহ্ন।
+    // ট্রান্সফার আয়-ব্যয় নয় — চিহ্ন ছাড়া নীল অঙ্ক, কোথা থেকে কোথায় দেখায়।
+    val isTransfer = item.type == "ট্রান্সফার"
+    val positive = item.type == "আয়" ||
+        (item.type == "সঞ্চয়" && item.direction != "উত্তোলন")
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (isTransfer) {
+                        tr("ট্রান্সফার", "Transfer") + ": " +
+                            transferDisplayLabel(item.account) + " → " +
+                            transferDisplayLabel(item.payer)
+                    } else {
+                        categoryLabel(item.category)
+                    },
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = dateLabel(item.date) + " • " +
+                        if (isTransfer) {
+                            transferDisplayLabel(item.account) + " → " +
+                                transferDisplayLabel(item.payer)
+                        } else {
+                            item.account
+                        },
+                    fontSize = 12.sp,
+                    color = GreyText
+                )
+                if (item.note.isNotBlank()) {
+                    Text(text = item.note, fontSize = 13.sp, color = GreyText)
+                }
+            }
+            Text(
+                text = if (isTransfer) moneyText(item.amount) else moneyTextSigned(item.amount, positive),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isTransfer) JomaBlue else if (positive) GreenMain else RedMain
+            )
+            Text(
+                text = "✕",
+                modifier = Modifier.padding(start = 12.dp).clickable { onDelete() },
+                fontSize = 16.sp,
+                color = GreyText
+            )
+        }
     }
 }
