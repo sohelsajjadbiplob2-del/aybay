@@ -202,9 +202,36 @@ fun HomeScreen(
     var lockConfirmCard by remember { mutableStateOf<String?>(null) }
     // লক করার পর পিন না থাকলে পিন ডায়ালগ নিজে থেকে খুলবে (জমার মতো)।
     var showPinDialog by remember { mutableStateOf(false) }
-    // লেনদেন পাতা: কোন মোট কার্ড খোলা আছে ("আয়"/"ব্যয়"/"সঞ্চয়"), না থাকলে null।
+    // লেনদেন অংশ: কোন মোট কার্ডের অংশ খোলা আছে ("আয়"/"ব্যয়"/"সঞ্চয়"), না থাকলে null।
     var ledgerPage by remember { mutableStateOf<String?>(null) }
-    // লক করা কার্ডের গায়ে চাপ দিলে পিন খুলে গেলে লেনদেন পাতা খুলবে।
+    // লেনদেন অংশের সময়সীমা: খোলার সময় হোমের সময়সীমা থেকে নেয়, তারপর নিজে চলে।
+    var ledgerPeriod by remember { mutableStateOf("মাসিক") }
+    // লেনদেন অংশের ডায়ালগ (রুটে থাকে) আর বিশ্লেষণে লুকানো খাত।
+    var ledgerHiddenCats by remember { mutableStateOf(loadHiddenAnalysisCats(context)) }
+    var showLedgerRecycleBin by remember { mutableStateOf(false) }
+    var showLedgerAnalysisEdit by remember { mutableStateOf(false) }
+    val deletedTransactions by viewModel.deletedTransactions.collectAsState()
+    fun openLedger(type: String) {
+        ledgerPeriod = period
+        ledgerPage = type
+    }
+    fun toggleLedger(type: String) {
+        if (ledgerPage == type) ledgerPage = null else openLedger(type)
+    }
+    // ইনলাইন লেনদেন অংশের হিসাব (বিশ্লেষণের ডায়ালগেও একই হিসাব লাগে)।
+    val ledgerPeriodList = if (ledgerPage == null) emptyList() else
+        ledgerFilterByPeriod(transactions, ledgerPeriod, today)
+            .filter { it.type == ledgerPage }
+            .sortedWith(compareByDescending<Transaction> { it.date }.thenByDescending { it.id })
+    val ledgerPeriodTotal = ledgerPeriodList.sumOf { ledgerSigned(it) }
+    val ledgerAnalysisGroups: List<Pair<String, Long>> = run {
+        val map = linkedMapOf<String, Long>()
+        for (t in ledgerPeriodList) {
+            map[t.category] = (map[t.category] ?: 0L) + ledgerSigned(t)
+        }
+        map.entries.sortedByDescending { it.value }.map { it.key to it.value }
+    }
+    // লক করা কার্ডের গায়ে চাপ দিলে পিন খুলে গেলে লেনদেন অংশ খুলবে।
     var pendingLedgerAfterUnlock by remember { mutableStateOf<String?>(null) }
     var expandedCards by remember { mutableStateOf(setOf<String>()) }
 
@@ -324,7 +351,6 @@ fun HomeScreen(
         accountBalances.sumOf { it.second }
     }
 
-    if (ledgerPage == null) {
     LazyColumn(
         modifier = Modifier.fillMaxWidth().background(PageBg).padding(horizontal = 12.dp)
     ) {
@@ -466,7 +492,7 @@ fun HomeScreen(
                             pendingLedgerAfterUnlock = "আয়"
                             unlockCard = "আয়"
                         } else {
-                            ledgerPage = "আয়"
+                            toggleLedger("আয়")
                         }
                     }
                 )
@@ -494,7 +520,7 @@ fun HomeScreen(
                             pendingLedgerAfterUnlock = "ব্যয়"
                             unlockCard = "ব্যয়"
                         } else {
-                            ledgerPage = "ব্যয়"
+                            toggleLedger("ব্যয়")
                         }
                     }
                 )
@@ -521,12 +547,30 @@ fun HomeScreen(
                             pendingLedgerAfterUnlock = "সঞ্চয়"
                             unlockCard = "সঞ্চয়"
                         } else {
-                            ledgerPage = "সঞ্চয়"
+                            toggleLedger("সঞ্চয়")
                         }
                     }
                 )
             }
-            // দ্রুত যোগ করুন + কার্ড সাজান
+            // লেনদেন অংশ: মোট কার্ডের নিচে, হোমের ভেতরেই খোলে (জমার মতো)।
+            if (ledgerPage != null) {
+                LedgerSection(
+                    viewModel = viewModel,
+                    type = ledgerPage!!,
+                    ledgerPeriod = ledgerPeriod,
+                    onLedgerPeriodChange = { ledgerPeriod = it },
+                    periodList = ledgerPeriodList,
+                    periodTotal = ledgerPeriodTotal,
+                    groups = ledgerAnalysisGroups,
+                    hiddenCats = ledgerHiddenCats,
+                    onBack = { ledgerPage = null },
+                    onAdd = onAdd,
+                    onShowRecycleBin = { showLedgerRecycleBin = true },
+                    onShowAnalysisEdit = { showLedgerAnalysisEdit = true }
+                )
+            }
+            // দ্রুত যোগ করুন + কার্ড সাজান (লেনদেন অংশ খোলা থাকলে লুকায়)।
+            if (ledgerPage == null) {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 shape = RoundedCornerShape(16.dp),
@@ -583,9 +627,12 @@ fun HomeScreen(
                     }
                 }
             }
+            }
         }
-        items(orderedVisible, key = { it }) { key ->
-            val pos = orderedVisible.indexOf(key)
+        // লেনদেন অংশ খোলা থাকলে চার্ট লুকায় (জমার মতো)।
+        val homeSections = if (ledgerPage != null) orderedVisible.filter { it != "chart" } else orderedVisible
+        items(homeSections, key = { it }) { key ->
+            val pos = homeSections.indexOf(key)
             when (key) {
                 "chart" -> {
                     Box(modifier = Modifier.fillMaxWidth()) {
@@ -719,7 +766,7 @@ fun HomeScreen(
                                 if (pos > 0) {
                                     MoveButton(Icons.Default.ArrowUpward) { moveSection(key, -1) }
                                 }
-                                if (pos < orderedVisible.size - 1) {
+                                if (pos < homeSections.size - 1) {
                                     MoveButton(Icons.Default.ArrowDownward) { moveSection(key, 1) }
                                 }
                             }
@@ -893,7 +940,7 @@ fun HomeScreen(
                                 if (pos > 0) {
                                     MoveButton(Icons.Default.ArrowUpward) { moveSection(key, -1) }
                                 }
-                                if (pos < orderedVisible.size - 1) {
+                                if (pos < homeSections.size - 1) {
                                     MoveButton(Icons.Default.ArrowDownward) { moveSection(key, 1) }
                                 }
                             }
@@ -947,7 +994,7 @@ fun HomeScreen(
                                 if (pos > 0) {
                                     MoveButton(Icons.Default.ArrowUpward) { moveSection(key, -1) }
                                 }
-                                if (pos < orderedVisible.size - 1) {
+                                if (pos < homeSections.size - 1) {
                                     MoveButton(Icons.Default.ArrowDownward) { moveSection(key, 1) }
                                 }
                             }
@@ -992,7 +1039,7 @@ fun HomeScreen(
                                 if (pos > 0) {
                                     MoveButton(Icons.Default.ArrowUpward) { moveSection(key, -1) }
                                 }
-                                if (pos < orderedVisible.size - 1) {
+                                if (pos < homeSections.size - 1) {
                                     MoveButton(Icons.Default.ArrowDownward) { moveSection(key, 1) }
                                 }
                             }
@@ -1311,7 +1358,7 @@ fun HomeScreen(
                                 if (pos > 0) {
                                     MoveButton(Icons.Default.ArrowUpward) { moveSection(key, -1) }
                                 }
-                                if (pos < orderedVisible.size - 1) {
+                                if (pos < homeSections.size - 1) {
                                     MoveButton(Icons.Default.ArrowDownward) { moveSection(key, 1) }
                                 }
                             }
@@ -1415,7 +1462,7 @@ fun HomeScreen(
                                 if (pos > 0) {
                                     MoveButton(Icons.Default.ArrowUpward) { moveSection(key, -1) }
                                 }
-                                if (pos < orderedVisible.size - 1) {
+                                if (pos < homeSections.size - 1) {
                                     MoveButton(Icons.Default.ArrowDownward) { moveSection(key, 1) }
                                 }
                             }
@@ -1507,7 +1554,7 @@ fun HomeScreen(
                                 if (pos > 0) {
                                     MoveButton(Icons.Default.ArrowUpward) { moveSection(key, -1) }
                                 }
-                                if (pos < orderedVisible.size - 1) {
+                                if (pos < homeSections.size - 1) {
                                     MoveButton(Icons.Default.ArrowDownward) { moveSection(key, 1) }
                                 }
                             }
@@ -1559,7 +1606,7 @@ fun HomeScreen(
                                 if (pos > 0) {
                                     MoveButton(Icons.Default.ArrowUpward) { moveSection(key, -1) }
                                 }
-                                if (pos < orderedVisible.size - 1) {
+                                if (pos < homeSections.size - 1) {
                                     MoveButton(Icons.Default.ArrowDownward) { moveSection(key, 1) }
                                 }
                             }
@@ -1641,15 +1688,28 @@ fun HomeScreen(
             }
         }
     }
+    // লেনদেন অংশের ডায়ালগগুলো রুটে থাকে, LazyColumn-এর ভেতরে নয়।
+    if (showLedgerRecycleBin) {
+        RecycleBinDialog(
+            deleted = deletedTransactions,
+            onRestore = { viewModel.restoreTransaction(it) },
+            onDeletePermanently = { viewModel.deleteTransactionPermanently(it) },
+            onDismiss = { showLedgerRecycleBin = false }
+        )
     }
-    // লেনদেন পাতা: হোমের বদলে খোলে; এর ডায়ালগগুলোও রুটে থাকে।
-    if (ledgerPage != null) {
-        LedgerPage(
-            viewModel = viewModel,
-            type = ledgerPage!!,
-            initialPeriod = period,
-            onBack = { ledgerPage = null },
-            onAdd = onAdd
+    if (showLedgerAnalysisEdit && ledgerPage != null) {
+        val editType = ledgerPage!!
+        AnalysisEditDialog(
+            type = editType,
+            groups = ledgerAnalysisGroups,
+            hiddenCats = ledgerHiddenCats,
+            onToggle = { cat, show ->
+                val key = "$editType|$cat"
+                val next = if (show) ledgerHiddenCats - key else ledgerHiddenCats + key
+                ledgerHiddenCats = next
+                saveHiddenAnalysisCats(context, next)
+            },
+            onDismiss = { showLedgerAnalysisEdit = false }
         )
     }
     // ডায়ালগগুলো LazyColumn-এর বাইরে: হোমের উপরে থাকলেও কম্পোজ হয়।
@@ -1760,9 +1820,9 @@ fun HomeScreen(
             onUnlocked = {
                 setSectionLocked(unlockKey, false)
                 unlockCard = null
-                // কার্ডের গায়ে চাপ দিয়ে পিন খুললে লেনদেন পাতা খুলবে।
+                // কার্ডের গায়ে চাপ দিয়ে পিন খুললে লেনদেন অংশ খুলবে।
                 if (pendingLedgerAfterUnlock == unlockKey) {
-                    ledgerPage = unlockKey
+                    openLedger(unlockKey)
                 }
                 pendingLedgerAfterUnlock = null
             },
