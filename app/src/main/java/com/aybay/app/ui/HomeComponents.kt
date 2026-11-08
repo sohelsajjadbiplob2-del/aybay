@@ -126,6 +126,12 @@ fun categoryIcon(category: String): String = when (category) {
     "বেতন", "মাসিক বেতন", "সাপ্তাহিক বেতন" -> "💼"
     "দৈনিক মজুরি" -> "👷"
     "সঞ্চয়" -> "🏺"
+    "ব্যাংক", "ব্যাংক (ডিপিএস, ...)" -> "🏦"
+    "মোবাইল ব্যাংকিং" -> "📱"
+    "ফান্ড" -> "📈"
+    "সোনা বা মূল্যবান..." -> "🎖️"
+    "মাটির ব্যাংক" -> "🏺"
+    "অন্যান্য সঞ্চয়" -> "➕"
     else -> "🏷️"
 }
 
@@ -141,9 +147,12 @@ fun JomaTotalCard(
     expanded: Boolean,
     onExpandClick: () -> Unit,
     expandedLines: List<String>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // কার্ডের গায়ে চাপ দিলে লেনদেন পাতা খোলে; তালা আর ▼-এর নিজের ক্লিক আলাদা থাকে।
+    onBodyClick: (() -> Unit)? = null
 ) {
     Card(
+        onClick = { onBodyClick?.invoke() },
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = bgColor),
@@ -354,7 +363,9 @@ fun AccountRow(name: String, sub: String, balance: Long) {
 
 @Composable
 fun RecentTransactionRow(item: Transaction) {
-    val positive = item.type == "আয়"
+    // জমা সঞ্চয় আয়ের মতো সবুজ + চিহ্ন; উত্তোলন ব্যয়ের মতো লাল − চিহ্ন।
+    val positive = item.type == "আয়" ||
+        (item.type == "সঞ্চয়" && item.direction != "উত্তোলন")
     val tint = when (item.type) {
         "আয়" -> GreenTint
         "ব্যয়" -> RedTint
