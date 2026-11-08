@@ -646,6 +646,7 @@ fun HomeScreen(
             when (key) {
                 "chart" -> {
                     Box(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                 JomaSectionHeader(
                     JomaBlue,
                     if (chartMode == "দৈনিক") {
@@ -766,6 +767,7 @@ fun HomeScreen(
                         }
                     }
                 }
+                    }
                         if (arrangeMode) {
                             Row(
                                 modifier = Modifier.align(Alignment.TopEnd)
@@ -784,6 +786,7 @@ fun HomeScreen(
                 }
                 "flow" -> {
                     Box(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                 JomaSectionHeader(
                     GreenMain,
                     tr("📈 মাসিক ব্যয়ের ট্রেন্ড চার্ট", "📈 Monthly Expense Trend Chart"),
@@ -940,6 +943,7 @@ fun HomeScreen(
                         }
                     }
                 }
+                    }
                         if (arrangeMode) {
                             Row(
                                 modifier = Modifier.align(Alignment.TopEnd)
@@ -958,6 +962,7 @@ fun HomeScreen(
                 }
                 "category" -> {
                     Box(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                 CategoryAnalysisCard(
                     type = "ব্যয়",
                     color = JomaBlue,
@@ -994,6 +999,7 @@ fun HomeScreen(
                     },
                     onSeeAll = onOpenReport
                 )
+                    }
                         if (arrangeMode) {
                             Row(
                                 modifier = Modifier.align(Alignment.TopEnd)
@@ -1012,6 +1018,7 @@ fun HomeScreen(
                 }
                 "due" -> {
                     Box(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                 JomaSectionHeader(
                     JomaBlue,
                     tr("🤝 বাকি ও ধার (Cash)", "🤝 Due & Loan (Cash)"),
@@ -1039,6 +1046,7 @@ fun HomeScreen(
                         DueBox(tr("ধার দেওয়া (Cash)", "Lent (Cash)"), moneyText(lent), GreenTint, "🟢", Modifier.weight(1f)) { onOpenDue() }
                     }
                 }
+                    }
                         if (arrangeMode) {
                             Row(
                                 modifier = Modifier.align(Alignment.TopEnd)
@@ -1057,6 +1065,7 @@ fun HomeScreen(
                 }
                 "ledger" -> {
                     Box(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                 JomaSectionHeader(JomaBlue, tr("📘 নাম অনুযায়ী খাতা", "📘 Ledger by Name"))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -1358,6 +1367,7 @@ fun HomeScreen(
                         }
                     }
                 }
+                    }
                         if (arrangeMode) {
                             Row(
                                 modifier = Modifier.align(Alignment.TopEnd)
@@ -1376,6 +1386,7 @@ fun HomeScreen(
                 }
                 "budget" -> {
                     Box(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                 JomaSectionHeader(JomaBlue, tr("🎯 মাসিক বাজেট", "🎯 Monthly Budget"))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -1462,6 +1473,7 @@ fun HomeScreen(
                         }
                     }
                 }
+                    }
                         if (arrangeMode) {
                             Row(
                                 modifier = Modifier.align(Alignment.TopEnd)
@@ -1480,6 +1492,7 @@ fun HomeScreen(
                 }
                 "accounts" -> {
                     Box(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                 JomaSectionHeader(
                     GreenMain,
                     tr("💳 অ্যাকাউন্ট ব্যালেন্স", "💳 Account Balance"),
@@ -1548,6 +1561,7 @@ fun HomeScreen(
                         }
                     }
                 }
+                    }
                         if (arrangeMode) {
                             Row(
                                 modifier = Modifier.align(Alignment.TopEnd)
@@ -1566,6 +1580,7 @@ fun HomeScreen(
                 }
                 "recent" -> {
                     Box(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                 JomaSectionHeader(JomaBlue, tr("সাম্প্রতিক লেনদেন", "Recent Transactions"))
                 if (transactions.isEmpty()) {
                     Card(
@@ -1600,6 +1615,7 @@ fun HomeScreen(
                         }
                     }
                 }
+                    }
                         if (arrangeMode) {
                             Row(
                                 modifier = Modifier.align(Alignment.TopEnd)
@@ -1889,6 +1905,7 @@ private fun CategoryAnalysisCard(
     }
     val groups = groupByCategory(filterByPeriod(transactions, catPeriod, today), type)
     val total = groups.values.sum()
+    Column(modifier = Modifier.fillMaxWidth()) {
     JomaSectionHeader(
         color,
         typeName + " " + tr("খাত অনুযায়ী বিশ্লেষণ", "Category Analysis"),
@@ -2004,6 +2021,7 @@ private fun CategoryAnalysisCard(
                 }
             }
         }
+    }
     }
 }
 
