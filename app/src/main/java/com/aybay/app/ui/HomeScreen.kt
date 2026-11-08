@@ -198,6 +198,8 @@ fun HomeScreen(
     var showSearchPin by remember { mutableStateOf(false) }
     // তালা চাপলে কনফার্ম পপআপ: কোন কার্ড লক করতে চাওয়া হচ্ছে ("আয়"/"ব্যয়"/"সঞ্চয়")।
     var lockConfirmCard by remember { mutableStateOf<String?>(null) }
+    // লক করার পর পিন না থাকলে পিন ডায়ালগ নিজে থেকে খুলবে (জমার মতো)।
+    var showPinDialog by remember { mutableStateOf(false) }
     var expandedCards by remember { mutableStateOf(setOf<String>()) }
 
     // ব্যালেন্স লুকানো/দেখানো (চোখের আইকন)।
@@ -1692,6 +1694,7 @@ fun HomeScreen(
                             onClick = {
                                 setSectionLocked(confirmKey, true)
                                 lockConfirmCard = null
+                                if (prefs.pin.isBlank()) showPinDialog = true
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
@@ -1715,6 +1718,14 @@ fun HomeScreen(
                 unlockCard = null
             },
             onDismiss = { unlockCard = null }
+        )
+    }
+    // লক করার পর পিন না থাকলে "পিন ও গোপনীয়তা" ডায়ালগ নিজে থেকে খুলবে (জমার মতো)।
+    if (showPinDialog) {
+        PinPrivacyDialog(
+            prefs = prefs,
+            onPrefsChange = { next -> saveAppPrefs(context, next); prefs = next },
+            onDismiss = { showPinDialog = false }
         )
     }
     // সার্চ বার লক খুলতে পিন ডায়ালগ।
