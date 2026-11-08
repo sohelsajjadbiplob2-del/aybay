@@ -23,8 +23,13 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -34,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aybay.app.data.Transaction
+import java.time.LocalDate
 
 // হোমের ছোট কম্পোনেন্ট — HomeScreen.kt ছোট রাখতে এখানে সরানো হয়েছে
 // (create_or_update_file-এ এক আর্গুমেন্টের 131072 বাইট সীমা পেরিয়ে যাচ্ছিল)।
@@ -251,18 +257,31 @@ fun FlowStatBox(
     value: String,
     bgColor: Color,
     accent: Color,
-    modifier: Modifier
+    modifier: Modifier,
+    icon: String = "",
+    titleColor: Color = GreyText
 ) {
     Column(
         modifier = modifier.background(bgColor, RoundedCornerShape(12.dp)).padding(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = title,
-            fontSize = 12.sp,
-            color = GreyText,
-            textAlign = TextAlign.Center
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (icon.isNotBlank()) {
+                Text(
+                    text = icon,
+                    fontSize = 12.sp,
+                    color = titleColor,
+                    textAlign = TextAlign.Center
+                )
+            }
+            Text(
+                text = title,
+                modifier = if (icon.isNotBlank()) Modifier.padding(start = 3.dp) else Modifier,
+                fontSize = 12.sp,
+                color = titleColor,
+                textAlign = TextAlign.Center
+            )
+        }
         Text(
             text = value,
             fontSize = 14.sp,
@@ -492,5 +511,176 @@ fun TransactionRow(item: Transaction, onDelete: () -> Unit) {
                 color = GreyText
             )
         }
+    }
+}
+
+// HomeScreen.kt থেকে সরানো: খাত অনুযায়ী বিশ্লেষণ কার্ড + তার হেলপার
+// (HomeScreen.kt-এর পুশ-JSON 131072 বাইট সীমা ছাড়িয়ে যাচ্ছিল)।
+
+fun filterByPeriod(list: List<Transaction>, period: String, today: LocalDate): List<Transaction> {
+    val todayKey = today.toString()
+    return when (period) {
+        "দৈনিক" -> list.filter { it.date == todayKey }
+        "সাপ্তাহিক" -> list.filter { it.date >= today.minusDays(6).toString() }
+        "বার্ষিক" -> list.filter { it.date.startsWith(todayKey.substring(0, 4)) }
+        else -> list.filter { it.date.startsWith(todayKey.substring(0, 7)) }
+    }
+}
+
+fun groupByCategory(list: List<Transaction>, type: String): Map<String, Long> {
+    val map = linkedMapOf<String, Long>()
+    for (t in list) {
+        if (t.type == type) {
+            val signed = if (type == "সঞ্চয়" && t.direction == "উত্তোলন") -t.amount else t.amount
+            map[t.category] = (map[t.category] ?: 0L) + signed
+        }
+    }
+    return map.entries.sortedByDescending { it.value }.associate { it.key to it.value }
+}
+
+@Composable
+fun CategoryAnalysisCard(
+    type: String,
+    color: Color,
+    transactions: List<Transaction>,
+    today: LocalDate,
+    onEditCategories: (String) -> Unit,
+    onSeeAll: () -> Unit
+) {
+    var catPeriod by remember { mutableStateOf("মাসিক") }
+    val typeName = when (type) {
+        "আয়" -> tr("আয়ের", "Income")
+        "ব্যয়" -> tr("ব্যয়ের", "Expense")
+        else -> tr("সঞ্চয়ের", "Savings")
+    }
+    val totalLabel = when (type) {
+        "আয়" -> tr("মোট আয়", "Total Income")
+        "ব্যয়" -> tr("মোট ব্যয়", "Total Expense")
+        else -> tr("মোট সঞ্চয়", "Total Savings")
+    }
+    val emptyText = when (type) {
+        "আয়" -> tr("এই সময়সীমায় কোনো আয়ের হিসাব নেই", "No income records in this period")
+        "ব্যয়" -> tr("এই সময়সীমায় কোনো ব্যয়ের হিসাব নেই", "No expense records in this period")
+        else -> tr("এই সময়সীমায় কোনো সঞ্চয়ের হিসাব নেই", "No savings records in this period")
+    }
+    val groups = groupByCategory(filterByPeriod(transactions, catPeriod, today), type)
+    val total = groups.values.sum()
+    Column(modifier = Modifier.fillMaxWidth()) {
+    JomaSectionHeader(
+        color,
+        typeName + " " + tr("খাত অনুযায়ী বিশ্লেষণ", "Category Analysis"),
+        trailing = {
+            Text(
+                text = tr("সম্পাদন করুন", "Edit"),
+                modifier = Modifier.clickable { onEditCategories(type) },
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = JomaBlue
+            )
+        }
+    )
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .background(GreyBg, RoundedCornerShape(12.dp))
+                    .padding(3.dp)
+            ) {
+                    for (p in listOf("দৈনিক", "সাপ্তাহিক", "মাসিক", "বার্ষিক")) {
+                        val selected = catPeriod == p
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    if (selected) color else Color.Transparent,
+                                    RoundedCornerShape(9.dp)
+                                )
+                                .clickable { catPeriod = p }
+                                .padding(vertical = 7.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = periodLabel(p),
+                                color = if (selected) Color.White else Color.Black,
+                                fontSize = 12.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RingDonut(
+                    if (total > 0L) color else TrackGrey,
+                    periodLabel(catPeriod),
+                    totalLabel,
+                    moneyText(total)
+                )
+                if (groups.isEmpty()) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        EmptyState("📭", emptyText)
+                    }
+                } else {
+                    Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                        for ((cat, amt) in groups.entries.take(5)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(30.dp)
+                                        .background(GreyBg, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(text = categoryIcon(cat), fontSize = 15.sp)
+                                }
+                                Text(
+                                    text = categoryLabel(cat),
+                                    modifier = Modifier.weight(1f).padding(start = 8.dp),
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = moneyText(amt),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            LinearProgressIndicator(
+                                progress = {
+                                    if (total > 0L) amt.toFloat() / total else 0f
+                                },
+                                modifier = Modifier.fillMaxWidth().height(6.dp),
+                                color = color,
+                                trackColor = TrackGrey
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+                    }
+                }
+            }
+            if (groups.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Text(
+                        text = tr("সব দেখুন", "See all"),
+                        modifier = Modifier.padding(top = 6.dp).clickable { onSeeAll() },
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = JomaBlue
+                    )
+                }
+            }
+        }
+    }
     }
 }
