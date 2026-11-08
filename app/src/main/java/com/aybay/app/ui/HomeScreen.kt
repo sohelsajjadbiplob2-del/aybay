@@ -40,7 +40,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -274,7 +273,7 @@ fun HomeScreen(
     val chartIncomeCount = chartTx.count { it.type == "আয়" }
     val chartExpenseCount = chartTx.count { it.type == "ব্যয়" }
 
-    // ফ্লো চার্ট: মাস বদলানো যায়, দিনে ট্যাপ করলে ওই দিনের ব্যয় দেখায়।
+    // ট্রেন্ড চার্ট: মাস বদলানো যায়, দিনে ট্যাপ করলে ওই দিনের ব্যয় দেখায়।
     var flowMonth by remember { mutableStateOf(monthKey) }
     var selectedDay by remember { mutableStateOf(today.dayOfMonth) }
     val flowYm = YearMonth.parse(flowMonth)
@@ -605,19 +604,21 @@ fun HomeScreen(
                                 .padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = if (arrangeMode) Icons.Default.Check else Icons.Default.SwapHoriz,
-                                contentDescription = null,
-                                tint = if (arrangeMode) Color.White else JomaBlue,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            if (arrangeMode) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                             Text(
                                 text = if (arrangeMode) {
                                     "✓ " + tr("সাজানো শেষ", "Done Arranging")
                                 } else {
-                                    tr("কার্ড সাজান", "Arrange Cards")
+                                    "↓↑ " + tr("কার্ড সাজান", "Arrange Cards")
                                 },
-                                modifier = Modifier.padding(start = 4.dp),
+                                modifier = Modifier.padding(start = if (arrangeMode) 4.dp else 0.dp),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (arrangeMode) Color.White else JomaBlue
@@ -648,23 +649,15 @@ fun HomeScreen(
                 JomaSectionHeader(
                     JomaBlue,
                     if (chartMode == "দৈনিক") {
-                        tr("আজকের আয়-ব্যয়ের চার্ট", "Today's Income-Expense Chart")
+                        tr("📊 আজকের আয়-ব্যয়ের চার্ট", "📊 Today's Income-Expense Chart")
                     } else {
-                        tr("মাসিক আয়-ব্যয়ের চার্ট", "Monthly Income-Expense Chart")
-                    }
-                )
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                        tr("📊 মাসিক আয়-ব্যয়ের চার্ট", "📊 Monthly Income-Expense Chart")
+                    },
+                    trailing = {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Spacer(modifier = Modifier.weight(1f))
                             Box(
                                 modifier = Modifier
                                     .background(LightBlueCard, RoundedCornerShape(16.dp))
@@ -678,7 +671,6 @@ fun HomeScreen(
                                     color = JomaBlue
                                 )
                             }
-                            Spacer(modifier = Modifier.width(8.dp))
                             Row(
                                 modifier = Modifier
                                     .background(GreyBg, RoundedCornerShape(16.dp))
@@ -697,7 +689,15 @@ fun HomeScreen(
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -784,19 +784,11 @@ fun HomeScreen(
                 }
                 "flow" -> {
                     Box(modifier = Modifier.fillMaxWidth()) {
-                JomaSectionHeader(GreenMain, tr("মাসিক ব্যয়ের ফ্লো চার্ট", "Monthly Expense Flow Chart"))
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                JomaSectionHeader(
+                    GreenMain,
+                    tr("📈 মাসিক ব্যয়ের ট্রেন্ড চার্ট", "📈 Monthly Expense Trend Chart"),
+                    trailing = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(
                                 onClick = {
                                     flowMonth = YearMonth.parse(flowMonth).minusMonths(1).toString()
@@ -830,7 +822,15 @@ fun HomeScreen(
                                 Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null)
                             }
                         }
-                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -960,7 +960,7 @@ fun HomeScreen(
                     Box(modifier = Modifier.fillMaxWidth()) {
                 CategoryAnalysisCard(
                     type = "ব্যয়",
-                    color = RedMain,
+                    color = JomaBlue,
                     transactions = transactions,
                     today = today,
                     onEditCategories = { t ->
@@ -984,7 +984,7 @@ fun HomeScreen(
                 )
                 CategoryAnalysisCard(
                     type = "সঞ্চয়",
-                    color = OrangeMain,
+                    color = PurpleMain,
                     transactions = transactions,
                     today = today,
                     onEditCategories = { t ->
@@ -1014,7 +1014,7 @@ fun HomeScreen(
                     Box(modifier = Modifier.fillMaxWidth()) {
                 JomaSectionHeader(
                     JomaBlue,
-                    tr("বাকি ও ধার (Cash)", "Due & Loan (Cash)"),
+                    tr("🤝 বাকি ও ধার (Cash)", "🤝 Due & Loan (Cash)"),
                     trailing = {
                         Text(
                             text = tr("বিস্তারিত দেখুন ›", "See details ›"),
@@ -1057,7 +1057,7 @@ fun HomeScreen(
                 }
                 "ledger" -> {
                     Box(modifier = Modifier.fillMaxWidth()) {
-                JomaSectionHeader(JomaBlue, tr("নাম অনুযায়ী খাতা", "Ledger by Name"))
+                JomaSectionHeader(JomaBlue, tr("📘 নাম অনুযায়ী খাতা", "📘 Ledger by Name"))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -1376,7 +1376,7 @@ fun HomeScreen(
                 }
                 "budget" -> {
                     Box(modifier = Modifier.fillMaxWidth()) {
-                JomaSectionHeader(JomaBlue, tr("মাসিক বাজেট", "Monthly Budget"))
+                JomaSectionHeader(JomaBlue, tr("🎯 মাসিক বাজেট", "🎯 Monthly Budget"))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -1482,7 +1482,7 @@ fun HomeScreen(
                     Box(modifier = Modifier.fillMaxWidth()) {
                 JomaSectionHeader(
                     GreenMain,
-                    tr("অ্যাকাউন্ট ব্যালেন্স", "Account Balance"),
+                    tr("💳 অ্যাকাউন্ট ব্যালেন্স", "💳 Account Balance"),
                     trailing = {
                         Button(
                             onClick = { showTransferDialog = true },
@@ -1493,14 +1493,8 @@ fun HomeScreen(
                             ),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.SwapHoriz,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
                             Text(
-                                text = tr("ট্রান্সফার", "Transfer"),
-                                modifier = Modifier.padding(start = 4.dp),
+                                text = "🔁 " + tr("ট্রান্সফার", "Transfer"),
                                 fontSize = 13.sp
                             )
                         }
@@ -1895,7 +1889,19 @@ private fun CategoryAnalysisCard(
     }
     val groups = groupByCategory(filterByPeriod(transactions, catPeriod, today), type)
     val total = groups.values.sum()
-    JomaSectionHeader(color, typeName + " " + tr("খাত অনুযায়ী বিশ্লেষণ", "Category Analysis"))
+    JomaSectionHeader(
+        color,
+        typeName + " " + tr("খাত অনুযায়ী বিশ্লেষণ", "Category Analysis"),
+        trailing = {
+            Text(
+                text = tr("সম্পাদন করুন", "Edit"),
+                modifier = Modifier.clickable { onEditCategories(type) },
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = JomaBlue
+            )
+        }
+    )
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -1904,14 +1910,10 @@ private fun CategoryAnalysisCard(
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth()
+                    .background(GreyBg, RoundedCornerShape(12.dp))
+                    .padding(3.dp)
             ) {
-                Row(
-                    modifier = Modifier.weight(1f)
-                        .background(GreyBg, RoundedCornerShape(12.dp))
-                        .padding(3.dp)
-                ) {
                     for (p in listOf("দৈনিক", "সাপ্তাহিক", "মাসিক", "বার্ষিক")) {
                         val selected = catPeriod == p
                         Box(
@@ -1934,15 +1936,6 @@ private fun CategoryAnalysisCard(
                         }
                     }
                 }
-                Text(
-                    text = tr("সম্পাদন করুন", "Edit"),
-                    modifier = Modifier.padding(start = 10.dp)
-                        .clickable { onEditCategories(type) },
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = JomaBlue
-                )
-            }
             Spacer(modifier = Modifier.height(10.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
