@@ -49,6 +49,7 @@ fun exportBackupJson(context: Context, items: List<Transaction>): File? {
             obj.put("date", item.date)
             obj.put("time", item.time)
             obj.put("note", item.note)
+            obj.put("direction", item.direction)
             arr.put(obj)
         }
         val dir = File(
@@ -78,7 +79,8 @@ fun parseBackupJson(text: String): List<Transaction> {
                     account = obj.optString("account", "হাতে নগদ"),
                     date = obj.optString("date", todayString()),
                     time = obj.optString("time", "00:00"),
-                    note = obj.optString("note", "")
+                    note = obj.optString("note", ""),
+                    direction = obj.optString("direction", "")
                 )
             )
         }
