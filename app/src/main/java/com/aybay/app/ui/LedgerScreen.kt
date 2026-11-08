@@ -354,7 +354,7 @@ fun LedgerSection(
                 if (shownGroups.isEmpty()) {
                     EmptyState("📭", emptyText)
                 } else {
-                    val maxAmt = shownGroups.maxOfOrNull { it.value } ?: 0L
+                    val maxAmt = shownGroups.maxOfOrNull { it.second } ?: 0L
                     for ((cat, amt) in shownGroups) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
