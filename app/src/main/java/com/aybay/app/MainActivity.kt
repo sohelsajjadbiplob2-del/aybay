@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -65,6 +66,7 @@ import androidx.navigation.navArgument
 import androidx.biometric.BiometricPrompt
 import com.aybay.app.data.scheduleAutoIncome
 import com.aybay.app.ui.AddFormScreen
+import com.aybay.app.ui.AppBannerOverlay
 import com.aybay.app.ui.AppPrefs
 import com.aybay.app.ui.AyBayViewModel
 import com.aybay.app.ui.BudgetScreen
@@ -87,6 +89,7 @@ import com.aybay.app.ui.loadAppPrefs
 import com.aybay.app.ui.parseBackupJson
 import com.aybay.app.ui.saveAppPrefs
 import com.aybay.app.ui.tr
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : FragmentActivity() {
@@ -142,6 +145,20 @@ fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPref
     LaunchedEffect(route) {
         if (route != "report") reportUnlocked = false
     }
+    // ব্যানার টাইমার: সতর্ক ~২s, সফলতা ~৪.৫s পর নিজে থেকে মিলায়।
+    // Tick বদলালে এফেক্ট নতুন করে শুরু হয় (আবার চাপ দিলে টাইমার রিস্টার্ট)।
+    LaunchedEffect(viewModel.warningTick) {
+        if (viewModel.warningVisible) {
+            delay(2000)
+            viewModel.dismissWarning()
+        }
+    }
+    LaunchedEffect(viewModel.savedTick) {
+        if (viewModel.savedBanner != null) {
+            delay(4500)
+            viewModel.dismissSavedBanner()
+        }
+    }
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
@@ -157,6 +174,8 @@ fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPref
         }
     }
 
+    // ব্যানার ওভারলে Scaffold-এর উপরে ভাসে (হেডার ঢেকে দেয়)।
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = PageBg,
         topBar = {
@@ -303,6 +322,8 @@ fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPref
                 }
             }
         }
+    }
+    AppBannerOverlay(viewModel)
     }
 }
 
