@@ -592,17 +592,22 @@ private fun IncomeExpenseBar(
         )
         Spacer(modifier = Modifier.height(6.dp))
         Box(
-            modifier = Modifier
-                .width(72.dp)
-                .height((150f * frac).dp)
-                .background(
-                    color,
-                    RoundedCornerShape(
-                        topStart = 10.dp, topEnd = 10.dp,
-                        bottomStart = 4.dp, bottomEnd = 4.dp
+            modifier = Modifier.width(72.dp).height(150.dp),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(72.dp)
+                    .height((150f * frac).dp)
+                    .background(
+                        color,
+                        RoundedCornerShape(
+                            topStart = 10.dp, topEnd = 10.dp,
+                            bottomStart = 4.dp, bottomEnd = 4.dp
+                        )
                     )
-                )
-        )
+            )
+        }
         Spacer(modifier = Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
