@@ -65,6 +65,8 @@ val PageBg = Color(0xFFF0F4FA)
 val LightBlueCard = Color(0xFFDBEAFE)
 val OrangeMain = Color(0xFFEA580C)
 val OrangeTint = Color(0xFFFED7AA)
+// সঞ্চয়ের বাদামি (জমা খরচের সঞ্চয় পাতা/বোতাম): গাঢ় বাদামি।
+val BrownMain = Color(0xFFA16207)
 val PurpleTint = Color(0xFFEDE9FE)
 val PinkTint = Color(0xFFFCE7F3)
 val PinkDisc = Color(0xFFF9A8A8)
