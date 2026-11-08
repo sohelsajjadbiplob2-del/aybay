@@ -147,12 +147,13 @@ fun DonutChart(
 fun MultiDonutChart(
     items: List<Pair<Color, Long>>,
     centerTop: String,
+    centerMid: String,
     centerBottom: String,
     modifier: Modifier = Modifier
 ) {
     val total = items.sumOf { it.second }
-    Box(modifier = modifier.size(110.dp), contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.size(110.dp)) {
+    Box(modifier = modifier.size(118.dp), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.size(118.dp)) {
             val stroke = Stroke(width = 30f)
             if (total <= 0L) {
                 drawArc(
@@ -181,14 +182,20 @@ fun MultiDonutChart(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = centerTop,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
+                color = Color.Black,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = centerMid,
+                fontSize = 12.sp,
                 color = GreyText,
                 textAlign = TextAlign.Center
             )
             Text(
                 text = centerBottom,
-                fontSize = 14.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black,
                 textAlign = TextAlign.Center
