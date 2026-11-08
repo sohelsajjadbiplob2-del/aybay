@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -40,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aybay.app.data.Transaction
 import java.time.LocalDate
+import kotlin.math.roundToInt
 
 // হোমের ছোট কম্পোনেন্ট — HomeScreen.kt ছোট রাখতে এখানে সরানো হয়েছে
 // (create_or_update_file-এ এক আর্গুমেন্টের 131072 বাইট সীমা পেরিয়ে যাচ্ছিল)।
@@ -565,6 +567,23 @@ fun CategoryAnalysisCard(
     }
     val groups = groupByCategory(filterByPeriod(transactions, catPeriod, today), type)
     val total = groups.values.sum()
+    // বাছাই করা ট্যাবের রং + খাতের রঙের ক্রম (জমার মতো): ব্যয়ে লাল থেকে শুরু, আয়ে সবুজ থেকে।
+    val tabColor = when (type) {
+        "ব্যয়" -> RedMain
+        "আয়" -> GreenMain
+        else -> PurpleMain
+    }
+    val palette = when (type) {
+        "ব্যয়" -> listOf(RedMain, OrangeMain, YellowMain, PinkMain, PurpleMain)
+        "আয়" -> listOf(GreenMain, BlueMain, PurpleMain, PinkMain, YellowMain)
+        else -> listOf(PurpleMain)
+    }
+    val tints = when (type) {
+        "ব্যয়" -> listOf(RedTint, OrangeTint, YellowTint, PinkTint, PurpleTint)
+        "আয়" -> listOf(GreenTint, BlueTint, PurpleTint, PinkTint, YellowTint)
+        else -> listOf(PurpleTint)
+    }
+    val donutItems = groups.entries.take(5).mapIndexed { i, e -> palette[i % palette.size] to e.value }
     Column(modifier = Modifier.fillMaxWidth()) {
     JomaSectionHeader(
         color,
@@ -587,7 +606,11 @@ fun CategoryAnalysisCard(
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+            Row(
+                modifier = Modifier.weight(1f)
                     .background(GreyBg, RoundedCornerShape(12.dp))
                     .padding(3.dp)
             ) {
@@ -597,7 +620,7 @@ fun CategoryAnalysisCard(
                             modifier = Modifier
                                 .weight(1f)
                                 .background(
-                                    if (selected) color else Color.Transparent,
+                                    if (selected) tabColor else Color.Transparent,
                                     RoundedCornerShape(9.dp)
                                 )
                                 .clickable { catPeriod = p }
@@ -613,56 +636,64 @@ fun CategoryAnalysisCard(
                         }
                     }
                 }
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RingDonut(
-                    if (total > 0L) color else TrackGrey,
-                    periodLabel(catPeriod),
-                    totalLabel,
-                    moneyText(total)
+                Spacer(modifier = Modifier.width(12.dp))
+                MultiDonutChart(
+                    items = donutItems,
+                    centerTop = periodLabel(catPeriod),
+                    centerMid = totalLabel,
+                    centerBottom = moneyText(total)
                 )
-                if (groups.isEmpty()) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        EmptyState("📭", emptyText)
-                    }
-                } else {
-                    Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                        for ((cat, amt) in groups.entries.take(5)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            if (groups.isEmpty()) {
+                EmptyState("📭", emptyText)
+            } else {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    for ((index, entry) in groups.entries.take(5).withIndex()) {
+                        val (cat, amt) = entry
+                        val catColor = palette[index % palette.size]
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier.size(30.dp)
+                                    .background(tints[index % tints.size], CircleShape),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Box(
-                                    modifier = Modifier.size(30.dp)
-                                        .background(GreyBg, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(text = categoryIcon(cat), fontSize = 15.sp)
-                                }
-                                Text(
-                                    text = categoryLabel(cat),
-                                    modifier = Modifier.weight(1f).padding(start = 8.dp),
-                                    fontSize = 14.sp
-                                )
-                                Text(
-                                    text = moneyText(amt),
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                                Text(text = categoryIcon(cat), fontSize = 15.sp)
                             }
+                            Text(
+                                text = categoryLabel(cat),
+                                modifier = Modifier.weight(1f).padding(start = 8.dp),
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = moneyText(amt),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             LinearProgressIndicator(
                                 progress = {
                                     if (total > 0L) amt.toFloat() / total else 0f
                                 },
-                                modifier = Modifier.fillMaxWidth().height(6.dp),
-                                color = color,
+                                modifier = Modifier.weight(1f).height(6.dp),
+                                color = catColor,
                                 trackColor = TrackGrey
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = if (total > 0L) toBengaliDigits("${(amt * 100f / total).roundToInt()}%") else toBengaliDigits("0%"),
+                                modifier = Modifier.padding(start = 8.dp),
+                                fontSize = 12.sp,
+                                color = GreyText
+                            )
                         }
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
             }
