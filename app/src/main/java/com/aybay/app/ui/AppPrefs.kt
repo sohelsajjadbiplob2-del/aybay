@@ -198,6 +198,18 @@ fun renameCustomSubcatCategory(context: Context, type: String, oldName: String, 
     )
 }
 
+// লেনদেন পাতার "খাত অনুযায়ী বিশ্লেষণ"-এ লুকানো খাত: "ধরন|খাত" আকারে
+// কমা দিয়ে সেভ থাকে (লক করা সেকশনের মতোই প্যাটার্ন)।
+fun loadHiddenAnalysisCats(context: Context): Set<String> =
+    (context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE)
+        .getString("hidden_analysis_cats", "") ?: "")
+        .split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
+fun saveHiddenAnalysisCats(context: Context, hidden: Set<String>) {
+    context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE).edit()
+        .putString("hidden_analysis_cats", hidden.joinToString(",")).apply()
+}
+
 // জমা খরচের আয়ের খাতগুলোর উপখাত (হুবহু); ব্যয় ও সঞ্চয়ে শুধু অন্যান্য।
 fun defaultSubcats(type: String, category: String): List<String> = when (type) {
     "আয়" -> when (category) {
