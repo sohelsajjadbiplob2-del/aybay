@@ -68,6 +68,7 @@ class FirebaseSync(context: Context) {
                 "time" to item.time,
                 "note" to item.note,
                 "payer" to item.payer,
+                "direction" to item.direction,
                 "updatedAt" to item.updatedAt
             )
             db.collection(coll).document(item.id.toString())
