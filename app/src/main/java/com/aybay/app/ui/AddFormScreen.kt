@@ -130,7 +130,7 @@ private fun formTileIcon(cat: String): String = when (cat) {
 @Composable
 fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: String = "", onSaved: () -> Unit) {
     val context = LocalContext.current
-    var type by remember { mutableStateOf(if (initialType == "ট্রান্সফার") "ব্যয়" else initialType) }
+    var type by remember { mutableStateOf(initialType) }
     var category by remember { mutableStateOf("") }
     var amountText by remember { mutableStateOf("") }
     var account by remember { mutableStateOf("হাতে নগদ") }
@@ -187,11 +187,16 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
         else -> 3
     }
     val cashBalance = (accounts.find { it.name == "হাতে নগদ" }?.balance ?: 0L) +
-        transactions.filter { it.account == "হাতে নগদ" }.sumOf {
+        transactions.filter {
+            it.account == "হাতে নগদ" ||
+                (it.type == "ট্রান্সফার" && it.payer == "হাতে নগদ")
+        }.sumOf {
             when (it.type) {
                 "আয়" -> it.amount
                 // সঞ্চয়ে জমা দিলে নগদ কমে, তুললে নগদ বাড়ে।
                 "সঞ্চয়" -> if (it.direction == "উত্তোলন") it.amount else -it.amount
+                // ট্রান্সফার: নগদ থেকে গেলে কমে, নগদে এলে বাড়ে।
+                "ট্রান্সফার" -> if (it.account == "হাতে নগদ") -it.amount else it.amount
                 else -> -it.amount
             }
         }
@@ -484,6 +489,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                                     maxLines = 2
                                 )
                                 // সঞ্চয়ে প্রতিটি ধরনের বর্তমান জমা (জমা − উত্তোলন) দেখায়।
+                                // ট্রান্সফার: এই ধরনে এলে বাড়ে, এই ধরন থেকে গেলে কমে।
                                 if (type == "সঞ্চয়") {
                                     Text(
                                         text = if (item.name == "অন্যান্য") {
@@ -491,10 +497,18 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                                         } else {
                                             moneyText(
                                                 transactions
-                                                    .filter { it.type == "সঞ্চয়" && it.category == item.name }
+                                                    .filter {
+                                                        (it.type == "সঞ্চয়" && it.category == item.name) ||
+                                                            (it.type == "ট্রান্সফার" &&
+                                                                (it.account == item.name || it.payer == item.name))
+                                                    }
                                                     .sumOf {
-                                                        if (it.direction == "উত্তোলন") -it.amount
-                                                        else it.amount
+                                                        when {
+                                                            it.type == "ট্রান্সফার" ->
+                                                                if (it.account == item.name) -it.amount else it.amount
+                                                            it.direction == "উত্তোলন" -> -it.amount
+                                                            else -> it.amount
+                                                        }
                                                     }
                                             )
                                         },
@@ -1080,7 +1094,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
             val canSave = amount > 0L && category.isNotBlank()
             Button(
                 onClick = {
-                    val finalType = if (type == "ট্রান্সফার") "ব্যয়" else type
+                    val finalType = type
                     val finalCategory =
                         if (subcat.isNotBlank() && subcat != "অন্যান্য") "${category} — ${subcat}"
                         else category
