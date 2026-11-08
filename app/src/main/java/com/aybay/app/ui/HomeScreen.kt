@@ -210,6 +210,9 @@ fun HomeScreen(
     var ledgerHiddenCats by remember { mutableStateOf(loadHiddenAnalysisCats(context)) }
     var showLedgerRecycleBin by remember { mutableStateOf(false) }
     var showLedgerAnalysisEdit by remember { mutableStateOf(false) }
+    // ট্রান্সফার ডায়ালগ: দ্রুত যোগের 🔄 টাইল আর অ্যাকাউন্ট অংশের
+    // ট্রান্সফার বোতাম — দুটোই এই ডায়ালগ খোলে।
+    var showTransferDialog by remember { mutableStateOf(false) }
     val deletedTransactions by viewModel.deletedTransactions.collectAsState()
     fun openLedger(type: String) {
         ledgerPeriod = period
@@ -334,13 +337,19 @@ fun HomeScreen(
     }
 
     // অ্যাকাউন্ট ব্যালেন্স: লেনদেন থেকে হিসাব।
+    // ট্রান্সফার: এই অ্যাকাউন্ট থেকে গেলে কমে, এই অ্যাকাউন্টে এলে বাড়ে
+    // (payer-এ গন্তব্যের নাম থাকে)।
     val accountBalances = accounts.map { acc ->
-        acc to (acc.balance + transactions.filter { it.account == acc.name }.sumOf {
+        acc to (acc.balance + transactions.filter {
+            it.account == acc.name ||
+                (it.type == "ট্রান্সফার" && it.payer == acc.name)
+        }.sumOf {
             when (it.type) {
                 "আয়" -> it.amount
                 "ব্যয়" -> -it.amount
                 // সঞ্চয়ে জমা দিলে নগদ কমে, তুললে নগদ বাড়ে।
                 "সঞ্চয়" -> if (it.direction == "উত্তোলন") it.amount else -it.amount
+                "ট্রান্সফার" -> if (it.account == acc.name) -it.amount else it.amount
                 else -> 0L
             }
         })
@@ -623,7 +632,7 @@ fun HomeScreen(
                         QuickAddTile("💵", tr("আয়", "Income"), GreenTint, Modifier.weight(1f)) { onAdd("আয়") }
                         QuickAddTile("💸", tr("ব্যয়", "Expense"), RedTint, Modifier.weight(1f)) { onAdd("ব্যয়") }
                         QuickAddTile("💰", tr("সঞ্চয়", "Savings"), YellowTint, Modifier.weight(1f)) { onAdd("সঞ্চয়") }
-                        QuickAddTile("🔄", tr("ট্রান্সফার", "Transfer"), PurpleTint, Modifier.weight(1f)) { onAdd("ট্রান্সফার") }
+                        QuickAddTile("🔄", tr("ট্রান্সফার", "Transfer"), PurpleTint, Modifier.weight(1f)) { showTransferDialog = true }
                     }
                 }
             }
@@ -1476,7 +1485,7 @@ fun HomeScreen(
                     tr("অ্যাকাউন্ট ব্যালেন্স", "Account Balance"),
                     trailing = {
                         Button(
-                            onClick = { onAdd("ট্রান্সফার") },
+                            onClick = { showTransferDialog = true },
                             shape = RoundedCornerShape(20.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = JomaBlue,
@@ -1723,6 +1732,14 @@ fun HomeScreen(
                 scheduleAutoIncome(context)
                 showAutoDialog = false
             }
+        )
+    }
+    // ট্রান্সফার ডায়ালগ (রুটে থাকে, LazyColumn-এর ভেতরে নয়)।
+    if (showTransferDialog) {
+        TransferDialog(
+            viewModel = viewModel,
+            onDismiss = { showTransferDialog = false },
+            onSaved = { showTransferDialog = false }
         )
     }
     // তালা কনফার্ম পপআপ: "লক করবেন কি?"
@@ -1993,44 +2010,6 @@ private fun CategoryAnalysisCard(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun TransactionRow(item: Transaction, onDelete: () -> Unit) {
-    // জমা সঞ্চয় সবুজ + চিহ্ন; উত্তোলন লাল − চিহ্ন।
-    val positive = item.type == "আয়" ||
-        (item.type == "সঞ্চয়" && item.direction != "উত্তোলন")
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = categoryLabel(item.category), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                Text(text = dateLabel(item.date) + " • " + item.account, fontSize = 12.sp, color = GreyText)
-                if (item.note.isNotBlank()) {
-                    Text(text = item.note, fontSize = 13.sp, color = GreyText)
-                }
-            }
-            Text(
-                text = moneyTextSigned(item.amount, positive),
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (positive) GreenMain else RedMain
-            )
-            Text(
-                text = "✕",
-                modifier = Modifier.padding(start = 12.dp).clickable { onDelete() },
-                fontSize = 16.sp,
-                color = GreyText
-            )
         }
     }
 }
