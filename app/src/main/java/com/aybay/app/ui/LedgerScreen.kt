@@ -33,15 +33,9 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -50,11 +44,12 @@ import androidx.compose.ui.window.Dialog
 import com.aybay.app.data.Transaction
 import java.time.LocalDate
 
-// লেনদেন পাতা (জমা খরচের মতো): মোট আয় / মোট ব্যয় / নীট সঞ্চয় কার্ডের
-// গায়ে চাপ দিলে খোলে। শিরোনামের লাইনে ডানে রিসাইকেল বিন আর ফিরে যান
-// বোতাম থাকে — চার্ট কার্ডের হেডিংয়ের মতো একই লাইনে।
+// লেনদেন অংশ (জমা খরচের মতো): মোট আয় / মোট ব্যয় / নীট সঞ্চয় কার্ডের
+// গায়ে চাপ দিলে হোমের ভেতরে, মোট কার্ডের নিচে খোলে — আলাদা পাতা নয়।
+// শিরোনামের লাইনে ডানে রিসাইকেল বিন আর ফিরে যান বোতাম থাকে — চার্ট
+// কার্ডের হেডিংয়ের মতো একই লাইনে।
 
-private fun ledgerFilterByPeriod(
+fun ledgerFilterByPeriod(
     list: List<Transaction>,
     period: String,
     today: LocalDate
@@ -83,25 +78,28 @@ private fun periodRange(period: String, today: LocalDate): Pair<String, String> 
     return fullDateLabel(start.toString()) to fullDateLabel(end.toString())
 }
 
-private fun ledgerSigned(t: Transaction): Long =
+fun ledgerSigned(t: Transaction): Long =
     if (t.type == "সঞ্চয়" && t.direction == "উত্তোলন") -t.amount else t.amount
 
+// লেনদেন অংশ: হোমের ভেতরে, মোট কার্ডের নিচে খোলে — আলাদা পাতা নয়।
+// হোমের LazyColumn-ই স্ক্রল করে, তাই এই অংশে নিজের কোনো স্ক্রল নেই;
+// হিসাব হোম থেকে আসে, ডায়ালগগুলো হোমের রুটে থাকে।
 @Composable
-fun LedgerPage(
+fun LedgerSection(
     viewModel: AyBayViewModel,
     type: String,
-    initialPeriod: String,
+    ledgerPeriod: String,
+    onLedgerPeriodChange: (String) -> Unit,
+    periodList: List<Transaction>,
+    periodTotal: Long,
+    groups: List<Pair<String, Long>>,
+    hiddenCats: Set<String>,
     onBack: () -> Unit,
-    onAdd: (String) -> Unit
+    onAdd: (String) -> Unit,
+    onShowRecycleBin: () -> Unit,
+    onShowAnalysisEdit: () -> Unit
 ) {
-    val context = LocalContext.current
-    val transactions by viewModel.transactions.collectAsState()
-    val deleted by viewModel.deletedTransactions.collectAsState()
     val today = LocalDate.now()
-    var ledgerPeriod by remember { mutableStateOf(initialPeriod) }
-    var showRecycleBin by remember { mutableStateOf(false) }
-    var showAnalysisEdit by remember { mutableStateOf(false) }
-    var hiddenCats by remember { mutableStateOf(loadHiddenAnalysisCats(context)) }
 
     val pageColor = when (type) {
         "আয়" -> GreenMain
@@ -139,24 +137,17 @@ fun LedgerPage(
         else -> tr("এই সময়সীমায় কোনো সঞ্চয়ের হিসাব নেই", "No savings records in this period")
     }
 
-    val periodList = ledgerFilterByPeriod(transactions, ledgerPeriod, today)
-        .filter { it.type == type }
-        .sortedWith(compareByDescending<Transaction> { it.date }.thenByDescending { it.id })
-    val periodTotal = periodList.sumOf { ledgerSigned(it) }
     val (rangeStart, rangeEnd) = periodRange(ledgerPeriod, today)
+    val shownGroups = groups.filter { (cat, _) -> "$type|$cat" !in hiddenCats }
 
-    val allGroups = run {
-        val map = linkedMapOf<String, Long>()
-        for (t in periodList) {
-            map[t.category] = (map[t.category] ?: 0L) + ledgerSigned(t)
-        }
-        map.entries.sortedByDescending { it.value }
-    }
-    val shownGroups = allGroups.filter { (cat, _) -> "$type|$cat" !in hiddenCats }
-
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
     Column(
-        modifier = Modifier.fillMaxWidth().background(PageBg).padding(horizontal = 12.dp)
-            .verticalScroll(rememberScrollState())
+        modifier = Modifier.fillMaxWidth().padding(12.dp)
     ) {
         // শিরোনাম: রঙিন ডট + নাম বামে, রিসাইকেল বিন + ফিরে যান ডানে, একই লাইনে।
         JomaSectionHeader(
@@ -168,7 +159,7 @@ fun LedgerPage(
                         modifier = Modifier
                             .background(Color.White, RoundedCornerShape(18.dp))
                             .border(1.dp, TrackGrey, RoundedCornerShape(18.dp))
-                            .clickable { showRecycleBin = true }
+                            .clickable { onShowRecycleBin() }
                             .padding(horizontal = 10.dp, vertical = 7.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -225,7 +216,7 @@ fun LedgerPage(
                             if (selected) pageColor else Color.Transparent,
                             RoundedCornerShape(9.dp)
                         )
-                        .clickable { ledgerPeriod = p }
+                        .clickable { onLedgerPeriodChange(p) }
                         .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -346,7 +337,7 @@ fun LedgerPage(
             )
             Text(
                 text = tr("সম্পাদন করুন", "Edit"),
-                modifier = Modifier.clickable { showAnalysisEdit = true },
+                modifier = Modifier.clickable { onShowAnalysisEdit() },
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = JomaBlue
@@ -400,30 +391,7 @@ fun LedgerPage(
                 }
             }
         }
-        Spacer(modifier = Modifier.height(24.dp))
     }
-    // ডায়ালগগুলো রুটে থাকে, LazyColumn-এর ভেতরে নয়।
-    if (showRecycleBin) {
-        RecycleBinDialog(
-            deleted = deleted,
-            onRestore = { viewModel.restoreTransaction(it) },
-            onDeletePermanently = { viewModel.deleteTransactionPermanently(it) },
-            onDismiss = { showRecycleBin = false }
-        )
-    }
-    if (showAnalysisEdit) {
-        AnalysisEditDialog(
-            type = type,
-            groups = allGroups.map { it.key to it.value },
-            hiddenCats = hiddenCats,
-            onToggle = { cat, show ->
-                val key = "$type|$cat"
-                val next = if (show) hiddenCats - key else hiddenCats + key
-                hiddenCats = next
-                saveHiddenAnalysisCats(context, next)
-            },
-            onDismiss = { showAnalysisEdit = false }
-        )
     }
 }
 
@@ -563,7 +531,7 @@ fun RecycleBinDialog(
 
 // বিশ্লেষণে কোন খাত দেখাবে — সম্পাদন করুন।
 @Composable
-private fun AnalysisEditDialog(
+fun AnalysisEditDialog(
     type: String,
     groups: List<Pair<String, Long>>,
     hiddenCats: Set<String>,
