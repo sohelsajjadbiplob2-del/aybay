@@ -39,6 +39,13 @@ fun categoryLabel(category: String): String = when (category) {
     "সাপ্তাহিক বেতন" -> tr("সাপ্তাহিক বেতন", "Weekly salary")
     "মাসিক বেতন" -> tr("মাসিক বেতন", "Monthly salary")
     "সঞ্চয়" -> tr("সঞ্চয়", "Savings")
+    "ব্যাংক" -> tr("ব্যাংক", "Bank")
+    "মোবাইল ব্যাংকিং" -> tr("মোবাইল ব্যাংকিং", "Mobile Banking")
+    "ব্যাংক (ডিপিএস, ...)" -> tr("ব্যাংক (ডিপিএস, ...)", "Bank (DPS, ...)")
+    "ফান্ড" -> tr("ফান্ড", "Fund")
+    "সোনা বা মূল্যবান..." -> tr("সোনা বা মূল্যবান...", "Gold or valuables...")
+    "মাটির ব্যাংক" -> tr("মাটির ব্যাংক", "Clay bank")
+    "অন্যান্য সঞ্চয়" -> tr("অন্যান্য সঞ্চয়", "Other savings")
     "অন্যান্য" -> tr("অন্যান্য", "Others")
     else -> category
 }
