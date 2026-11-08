@@ -102,7 +102,8 @@ private fun totalsOf(list: List<Transaction>): Totals {
         when (t.type) {
             "আয়" -> income += t.amount
             "ব্যয়" -> expense += t.amount
-            "সঞ্চয়" -> savings += t.amount
+            // জমা যোগ, উত্তোলন বিয়োগ (পুরনো সঞ্চয় = জমা)।
+            "সঞ্চয়" -> savings += if (t.direction == "উত্তোলন") -t.amount else t.amount
         }
     }
     return Totals(income, expense, savings)
@@ -122,7 +123,8 @@ private fun groupByCategory(list: List<Transaction>, type: String): Map<String, 
     val map = linkedMapOf<String, Long>()
     for (t in list) {
         if (t.type == type) {
-            map[t.category] = (map[t.category] ?: 0L) + t.amount
+            val signed = if (type == "সঞ্চয়" && t.direction == "উত্তোলন") -t.amount else t.amount
+            map[t.category] = (map[t.category] ?: 0L) + signed
         }
     }
     return map.entries.sortedByDescending { it.value }.associate { it.key to it.value }
@@ -200,6 +202,10 @@ fun HomeScreen(
     var lockConfirmCard by remember { mutableStateOf<String?>(null) }
     // লক করার পর পিন না থাকলে পিন ডায়ালগ নিজে থেকে খুলবে (জমার মতো)।
     var showPinDialog by remember { mutableStateOf(false) }
+    // লেনদেন পাতা: কোন মোট কার্ড খোলা আছে ("আয়"/"ব্যয়"/"সঞ্চয়"), না থাকলে null।
+    var ledgerPage by remember { mutableStateOf<String?>(null) }
+    // লক করা কার্ডের গায়ে চাপ দিলে পিন খুলে গেলে লেনদেন পাতা খুলবে।
+    var pendingLedgerAfterUnlock by remember { mutableStateOf<String?>(null) }
     var expandedCards by remember { mutableStateOf(setOf<String>()) }
 
     // ব্যালেন্স লুকানো/দেখানো (চোখের আইকন)।
@@ -305,7 +311,9 @@ fun HomeScreen(
         acc to (acc.balance + transactions.filter { it.account == acc.name }.sumOf {
             when (it.type) {
                 "আয়" -> it.amount
-                "ব্যয়", "সঞ্চয়" -> -it.amount
+                "ব্যয়" -> -it.amount
+                // সঞ্চয়ে জমা দিলে নগদ কমে, তুললে নগদ বাড়ে।
+                "সঞ্চয়" -> if (it.direction == "উত্তোলন") it.amount else -it.amount
                 else -> 0L
             }
         })
@@ -316,6 +324,7 @@ fun HomeScreen(
         accountBalances.sumOf { it.second }
     }
 
+    if (ledgerPage == null) {
     LazyColumn(
         modifier = Modifier.fillMaxWidth().background(PageBg).padding(horizontal = 12.dp)
     ) {
@@ -451,7 +460,15 @@ fun HomeScreen(
                         tr("মাসিক সেট", "Monthly set") + ": " + moneyText(prefs.autoSalaryAmount),
                         tr("অটো সেট থেকে নির্ধারণ করুন", "Set from Auto Set")
                     ),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onBodyClick = {
+                        if ("আয়" in lockedCards) {
+                            pendingLedgerAfterUnlock = "আয়"
+                            unlockCard = "আয়"
+                        } else {
+                            ledgerPage = "আয়"
+                        }
+                    }
                 )
                 JomaTotalCard(
                     title = tr("মোট ব্যয়", "Total Expense"),
@@ -471,7 +488,15 @@ fun HomeScreen(
                         tr("মোট বাজেট", "Total Budget") + ": " + moneyText(totalBudgetAll),
                         tr("বাজেট সেকশনে সেট করুন", "Set in Budget section")
                     ),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onBodyClick = {
+                        if ("ব্যয়" in lockedCards) {
+                            pendingLedgerAfterUnlock = "ব্যয়"
+                            unlockCard = "ব্যয়"
+                        } else {
+                            ledgerPage = "ব্যয়"
+                        }
+                    }
                 )
                 JomaTotalCard(
                     title = tr("নীট সঞ্চয়", "Net Savings"),
@@ -490,7 +515,15 @@ fun HomeScreen(
                     expandedLines = listOf(
                         tr("মোট সঞ্চয়", "Total Savings") + ": " + moneyText(totalsAll.savings)
                     ),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onBodyClick = {
+                        if ("সঞ্চয়" in lockedCards) {
+                            pendingLedgerAfterUnlock = "সঞ্চয়"
+                            unlockCard = "সঞ্চয়"
+                        } else {
+                            ledgerPage = "সঞ্চয়"
+                        }
+                    }
                 )
             }
             // দ্রুত যোগ করুন + কার্ড সাজান
@@ -1608,6 +1641,17 @@ fun HomeScreen(
             }
         }
     }
+    }
+    // লেনদেন পাতা: হোমের বদলে খোলে; এর ডায়ালগগুলোও রুটে থাকে।
+    if (ledgerPage != null) {
+        LedgerPage(
+            viewModel = viewModel,
+            type = ledgerPage!!,
+            initialPeriod = period,
+            onBack = { ledgerPage = null },
+            onAdd = onAdd
+        )
+    }
     // ডায়ালগগুলো LazyColumn-এর বাইরে: হোমের উপরে থাকলেও কম্পোজ হয়।
     if (showAutoDialog) {
         AutoIncomeDialog(
@@ -1716,8 +1760,13 @@ fun HomeScreen(
             onUnlocked = {
                 setSectionLocked(unlockKey, false)
                 unlockCard = null
+                // কার্ডের গায়ে চাপ দিয়ে পিন খুললে লেনদেন পাতা খুলবে।
+                if (pendingLedgerAfterUnlock == unlockKey) {
+                    ledgerPage = unlockKey
+                }
+                pendingLedgerAfterUnlock = null
             },
-            onDismiss = { unlockCard = null }
+            onDismiss = { unlockCard = null; pendingLedgerAfterUnlock = null }
         )
     }
     // লক করার পর পিন না থাকলে "পিন ও গোপনীয়তা" ডায়ালগ নিজে থেকে খুলবে (জমার মতো)।
@@ -1890,7 +1939,9 @@ private fun CategoryAnalysisCard(
 
 @Composable
 fun TransactionRow(item: Transaction, onDelete: () -> Unit) {
-    val positive = item.type == "আয়"
+    // জমা সঞ্চয় সবুজ + চিহ্ন; উত্তোলন লাল − চিহ্ন।
+    val positive = item.type == "আয়" ||
+        (item.type == "সঞ্চয়" && item.direction != "উত্তোলন")
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         shape = RoundedCornerShape(14.dp),
