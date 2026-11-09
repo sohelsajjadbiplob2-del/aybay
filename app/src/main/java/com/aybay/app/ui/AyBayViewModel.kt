@@ -93,6 +93,12 @@ class AyBayViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // লেনদেন সম্পাদনা: রিপোর্ট পেজের ✏️ থেকে ফরম খুলে বদলে সংরক্ষণ
+    // করলে ওই লেনদেনটাই বদলায় — নতুন লেনদেন তৈরি হয় না।
+    fun updateTransaction(item: Transaction) {
+        viewModelScope.launch { repo.updateTransaction(item) }
+    }
+
     // মুছে ফেলা = রিসাইকেল বিনে যাওয়া (চিরতরে মোছে না)।
     fun deleteTransaction(item: Transaction) {
         viewModelScope.launch { repo.softDeleteTransaction(item) }
@@ -129,6 +135,10 @@ class AyBayViewModel(app: Application) : AndroidViewModel(app) {
 
     fun updateBudget(item: Budget) {
         viewModelScope.launch { repo.updateBudget(item) }
+    }
+
+    fun deleteBudget(item: Budget) {
+        viewModelScope.launch { repo.deleteBudget(item) }
     }
 
     fun addNote(item: Note) {
