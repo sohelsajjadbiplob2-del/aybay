@@ -790,7 +790,7 @@ private fun DueNameRow(
 // বাজেট সেট ডায়ালগ: মোট মাসিক + দৈনিক (ঐচ্ছিক) + ১৪ খাতের সীমা
 // (অন্যান্য ব্যয় বাদে)। খালি রাখা খাতের আগের সীমা মুছে যায়।
 @Composable
-private fun BudgetSetupDialog(
+fun BudgetSetupDialog(
     context: Context,
     monthKey: String,
     budgets: List<Budget>,
