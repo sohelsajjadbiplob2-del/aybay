@@ -233,10 +233,8 @@ fun HomeScreen(
     var pendingBudgetSetupAfterUnlock by remember { mutableStateOf(false) }
     var expandedCards by remember { mutableStateOf(setOf<String>()) }
 
-    // ব্যালেন্স লুকানো/দেখানো (চোখের আইকন)।
     var balanceHidden by rememberSaveable { mutableStateOf(false) }
 
-    // ডাটা ব্যাকআপ পিল: আসল backup.json থাকলেই done।
     var backupDone by remember { mutableStateOf(backupFileExists()) }
 
     // কার্ড সাজান: সেকশনের ক্রম ফোনে সেভ থাকে, সব সেকশন সবসময় দেখায়।
@@ -255,10 +253,8 @@ fun HomeScreen(
         saveHomeSectionOrder(context, list)
     }
 
-    // অটো আয় সেট ডায়ালগ।
     var showAutoDialog by remember { mutableStateOf(false) }
 
-    // মাসিক চার্ট: দৈনিক/মাসিক টগল।
     var chartMode by remember { mutableStateOf("মাসিক") }
     val chartTx = if (chartMode == "দৈনিক") {
         transactions.filter { it.date == todayKey }
@@ -269,7 +265,6 @@ fun HomeScreen(
     val chartIncomeCount = chartTx.count { it.type == "আয়" }
     val chartExpenseCount = chartTx.count { it.type == "ব্যয়" }
 
-    // ফ্লো চার্ট: মাস বদলানো যায়, দিনে ট্যাপ বা স্লাইড করলে ওই দিনের ব্যয় দেখায়।
     var flowMonth by remember { mutableStateOf(monthKey) }
     var selectedDay by remember { mutableStateOf(today.dayOfMonth) }
     val flowYm = YearMonth.parse(flowMonth)
@@ -290,13 +285,11 @@ fun HomeScreen(
     val selValue = flowDaily[selDay - 1]
     val selDate = flowYm.atDay(selDay).toString()
 
-    // বাকি ও ধার: আসল Due ডেটা থেকে তিনটা বাক্স।
     val pendingDue = dueItems.filter { !it.isPaid }
     val dueTotal = pendingDue.filter { it.kind == "বাকি" }.sumOf { it.amount }
     val borrowed = pendingDue.filter { it.kind == "ধার" && it.direction == "নিয়েছি" }.sumOf { it.amount }
     val lent = pendingDue.filter { it.kind == "ধার" && it.direction == "দিয়েছি" }.sumOf { it.amount }
 
-    // নাম অনুযায়ী খাতা।
     var ledgerType by remember { mutableStateOf("আয়") }
     var fromDate by remember { mutableStateOf<LocalDate?>(null) }
     var toDate by remember { mutableStateOf<LocalDate?>(null) }
@@ -318,7 +311,6 @@ fun HomeScreen(
     val ledgerMax = ledgerShown.maxOfOrNull { it.value } ?: 0L
     val ledgerMaxName = ledgerShown.maxByOrNull { it.value }?.key ?: ""
 
-    // খাত সম্পাদন ডায়ালগ।
     var editCatType by remember { mutableStateOf<String?>(null) }
     var customCats by remember { mutableStateOf<Set<String>>(emptySet()) }
     var newCatText by remember { mutableStateOf("") }
@@ -331,7 +323,6 @@ fun HomeScreen(
         ).show()
     }
 
-    // অ্যাকাউন্ট ব্যালেন্স: লেনদেন থেকে হিসাব।
     // ট্রান্সফার: এই অ্যাকাউন্ট থেকে গেলে কমে, এই অ্যাকাউন্টে এলে বাড়ে
     // (payer-এ গন্তব্যের নাম থাকে)।
     val accountBalances = accounts.map { acc ->
@@ -360,7 +351,6 @@ fun HomeScreen(
         modifier = Modifier.fillMaxWidth().background(PageBg).padding(horizontal = 12.dp)
     ) {
         item {
-            // ব্যালেন্স কার্ড — হালকা নীল
             Card(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 shape = RoundedCornerShape(20.dp),
@@ -434,7 +424,6 @@ fun HomeScreen(
                     }
                 }
             }
-            // সময়ের ট্যাব — সিলেক্টেড নীল
             Card(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 shape = RoundedCornerShape(16.dp),
@@ -468,7 +457,6 @@ fun HomeScreen(
                     }
                 }
             }
-            // মোট কার্ড — তালা আর ড্রপডাউন সহ
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1452,20 +1440,31 @@ fun HomeScreen(
                 ) {
                     Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
                         if (budgets.isEmpty()) {
-                            Button(
-                                onClick = onOpenBudget,
+                            Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = GreyBg,
-                                    contentColor = Color.Black
-                                )
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Text(
-                                    text = "+ " + tr("বাজেট সেট করুন", "Set Budget"),
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold
+                                    text = tr("মাসের খরচের সীমা ঠিক করুন, সীমা পার হলে সতর্কতা পাবেন", "Set a limit for your monthly spending and get an alert when you exceed it"),
+                                    fontSize = 14.sp,
+                                    color = GreyText,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
                                 )
+                                Button(
+                                    onClick = onOpenBudget,
+                                    shape = RoundedCornerShape(24.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = BudgetPillBtnBg,
+                                        contentColor = Color.Black
+                                    )
+                                ) {
+                                    Text(
+                                        text = "+ " + tr("বাজেট সেট করুন", "Set Budget"),
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
                         } else {
                             val totalLimit = budgets.sumOf { it.limitAmount }
@@ -1957,7 +1956,6 @@ fun HomeScreen(
     }
 }
 
-// অটো আয় সেট ডায়ালগ (মাসিক ও দৈনিক) — জমা খরচের মতো।
 @Composable
 private fun AutoIncomeDialog(
     prefs: AppPrefs,
@@ -2291,4 +2289,3 @@ private fun AutoIncomeDialog(
     }
 }
 
-// কার্ড সাজান মোডে কার্ডের উপরে-নিচে সরানোর নীল গোল বোতাম।
