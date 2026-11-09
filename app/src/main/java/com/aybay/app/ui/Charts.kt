@@ -75,6 +75,9 @@ val LedgerBrown = Color(0xFFA97920)
 // জমার চার্টের বারের আসল রং (ভিডিওর ফ্রেম থেকে): আয় হালকা উজ্জ্বল সবুজ, ব্যয় হালকা কোরাল লাল।
 val ChartBarGreen = Color(0xFF74D269)
 val ChartBarRed = Color(0xFFE88880)
+// অটো আয় সেট ডায়ালগের কার্ডের রং (জমা খরচের ভিডিও থেকে মাপা): মাসিক হালকা সবুজ, দৈনিক হালকা নীল-ধূসর।
+val AutoDialogGreenBg = Color(0xFFE2F6DC)
+val AutoDialogBlueBg = Color(0xFFF2F7FC)
 val PurpleTint = Color(0xFFEDE9FE)
 val PinkTint = Color(0xFFFCE7F3)
 val PinkDisc = Color(0xFFF9A8A8)
