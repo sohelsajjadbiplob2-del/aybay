@@ -229,6 +229,8 @@ fun HomeScreen(
     // লক করা কার্ডের গায়ে চাপ দিলে পিন খুলে গেলে লেনদেন অংশ খুলবে।
     var pendingLedgerAfterUnlock by remember { mutableStateOf<String?>(null) }
     var pendingAutoDialogAfterUnlock by remember { mutableStateOf(false) }
+    var showBudgetSetup by remember { mutableStateOf(false) }
+    var pendingBudgetSetupAfterUnlock by remember { mutableStateOf(false) }
     var expandedCards by remember { mutableStateOf(setOf<String>()) }
 
     // ব্যালেন্স লুকানো/দেখানো (চোখের আইকন)।
@@ -537,6 +539,14 @@ fun HomeScreen(
                             unlockCard = "ব্যয়"
                         } else {
                             toggleLedger("ব্যয়")
+                        }
+                    },
+                    onExpandedClick = {
+                        if ("ব্যয়" in lockedCards) {
+                            pendingBudgetSetupAfterUnlock = true
+                            unlockCard = "ব্যয়"
+                        } else {
+                            showBudgetSetup = true
                         }
                     }
                 )
@@ -1790,6 +1800,19 @@ fun HomeScreen(
             }
         )
     }
+    // বাজেট সেট ডায়ালগ (মোট ব্যয় কার্ডের নিচের লাইনে চাপ দিলে খোলে)।
+    if (showBudgetSetup) {
+        BudgetSetupDialog(
+            context = context,
+            monthKey = monthKey,
+            budgets = allBudgets.filter { it.monthKey == monthKey },
+            monthTotal = loadMonthlyBudgetTotal(context, monthKey),
+            monthDaily = loadMonthlyBudgetDaily(context, monthKey),
+            viewModel = viewModel,
+            onDismiss = { showBudgetSetup = false },
+            onSaved = { _, _ -> showBudgetSetup = false }
+        )
+    }
     // ট্রান্সফার ডায়ালগ (রুটে থাকে, LazyColumn-এর ভেতরে নয়)।
     if (showTransferDialog) {
         TransferDialog(
@@ -1903,8 +1926,13 @@ fun HomeScreen(
                     showAutoDialog = true
                 }
                 pendingAutoDialogAfterUnlock = false
+                // মোট ব্যয়ের নিচের লাইনে চাপ দিয়ে পিন খুললে বাজেট সেট ডায়ালগ খুলবে।
+                if (pendingBudgetSetupAfterUnlock) {
+                    showBudgetSetup = true
+                }
+                pendingBudgetSetupAfterUnlock = false
             },
-            onDismiss = { unlockCard = null; pendingLedgerAfterUnlock = null; pendingAutoDialogAfterUnlock = false }
+            onDismiss = { unlockCard = null; pendingLedgerAfterUnlock = null; pendingAutoDialogAfterUnlock = false; pendingBudgetSetupAfterUnlock = false }
         )
     }
     // লক করার পর পিন না থাকলে "পিন ও গোপনীয়তা" ডায়ালগ নিজে থেকে খুলবে (জমার মতো)।
