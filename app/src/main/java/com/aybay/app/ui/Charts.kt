@@ -75,6 +75,8 @@ val LedgerBrown = Color(0xFFA97920)
 // জমার চার্টের বারের আসল রং (ভিডিওর ফ্রেম থেকে): আয় হালকা উজ্জ্বল সবুজ, ব্যয় হালকা কোরাল লাল।
 val ChartBarGreen = Color(0xFF74D269)
 val ChartBarRed = Color(0xFFE88880)
+// জমার ফ্লো চার্টের সর্বোচ্চ দিনের বিন্দুর আসল রং (ছবি থেকে পিক্সেল মেপে নেওয়া)।
+val FlowMaxRed = Color(0xFFE11E46)
 // অটো আয় সেট ডায়ালগের কার্ডের রং (জমা খরচের ভিডিও থেকে মাপা): মাসিক হালকা সবুজ, দৈনিক হালকা নীল-ধূসর।
 val AutoDialogGreenBg = Color(0xFFE2F6DC)
 val AutoDialogBlueBg = Color(0xFFF2F7FC)
@@ -754,7 +756,7 @@ fun FlowLineChart(
                 drawPath(linePath, color = GreenMain, style = Stroke(width = 5f))
                 val maxDay = values.indexOf(max) + 1
                 drawCircle(
-                    color = GreenMain,
+                    color = FlowMaxRed,
                     radius = 12f,
                     center = Offset(x(maxDay), y(max))
                 )
