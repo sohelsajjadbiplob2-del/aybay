@@ -97,7 +97,8 @@ fun LedgerSection(
     onBack: () -> Unit,
     onAdd: (String) -> Unit,
     onShowRecycleBin: () -> Unit,
-    onShowAnalysisEdit: () -> Unit
+    onShowAnalysisEdit: () -> Unit,
+    onOpenReport: () -> Unit
 ) {
     val today = LocalDate.now()
 
@@ -337,7 +338,10 @@ fun LedgerSection(
             )
             Text(
                 text = tr("সম্পাদন করুন", "Edit"),
-                modifier = Modifier.clickable { onShowAnalysisEdit() },
+                modifier = Modifier.clickable {
+                    HomeNavState.reportType = type
+                    onOpenReport()
+                },
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = JomaBlue
