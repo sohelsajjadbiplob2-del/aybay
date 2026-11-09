@@ -440,6 +440,11 @@ fun AnalysisEditDialog(
     onToggle: (String, Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val typeName = when (type) {
+        "আয়" -> tr("আয়ের", "Income")
+        "ব্যয়" -> tr("ব্যয়ের", "Expense")
+        else -> tr("সঞ্চয়ের", "Savings")
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
