@@ -228,6 +228,7 @@ fun HomeScreen(
     }
     // লক করা কার্ডের গায়ে চাপ দিলে পিন খুলে গেলে লেনদেন অংশ খুলবে।
     var pendingLedgerAfterUnlock by remember { mutableStateOf<String?>(null) }
+    var pendingAutoDialogAfterUnlock by remember { mutableStateOf(false) }
     var expandedCards by remember { mutableStateOf(setOf<String>()) }
 
     // ব্যালেন্স লুকানো/দেখানো (চোখের আইকন)।
@@ -495,6 +496,14 @@ fun HomeScreen(
                             unlockCard = "আয়"
                         } else {
                             toggleLedger("আয়")
+                        }
+                    },
+                    onExpandedClick = {
+                        if ("আয়" in lockedCards) {
+                            pendingAutoDialogAfterUnlock = true
+                            unlockCard = "আয়"
+                        } else {
+                            showAutoDialog = true
                         }
                     }
                 )
@@ -1889,8 +1898,13 @@ fun HomeScreen(
                     openLedger(unlockKey)
                 }
                 pendingLedgerAfterUnlock = null
+                // নিচের লাইনে চাপ দিয়ে পিন খুললে অটো সেট ডায়ালগ খুলবে।
+                if (pendingAutoDialogAfterUnlock) {
+                    showAutoDialog = true
+                }
+                pendingAutoDialogAfterUnlock = false
             },
-            onDismiss = { unlockCard = null; pendingLedgerAfterUnlock = null }
+            onDismiss = { unlockCard = null; pendingLedgerAfterUnlock = null; pendingAutoDialogAfterUnlock = false }
         )
     }
     // লক করার পর পিন না থাকলে "পিন ও গোপনীয়তা" ডায়ালগ নিজে থেকে খুলবে (জমার মতো)।
