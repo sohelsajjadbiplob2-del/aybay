@@ -51,12 +51,12 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
-private val JOMA_INCOME_CATS = listOf(
+val JOMA_INCOME_CATS = listOf(
     "বেতন", "ব্যবসা", "পণ্য বিক্রি", "ভাড়া", "সেবা আয়", "ভাতা", "অনলাইন ইনকাম", "অন্যান্য"
 )
 
 // জমা খরচের সঞ্চয়ের ধরন (হুবহু); অন্যান্য সঞ্চয় টাইলে নতুন ধরন যোগ হয়।
-private val JOMA_SAVINGS_TYPES = listOf(
+val JOMA_SAVINGS_TYPES = listOf(
     "ব্যাংক", "মোবাইল ব্যাংকিং", "ব্যাংক (ডিপিএস, ...)", "ফান্ড", "সোনা বা মূল্যবান...", "মাটির ব্যাংক"
 )
 
@@ -128,16 +128,28 @@ private fun formTileIcon(cat: String): String = when (cat) {
 }
 
 @Composable
-fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: String = "", onSaved: () -> Unit) {
+fun AddFormScreen(
+    viewModel: AyBayViewModel,
+    initialType: String,
+    initialNote: String = "",
+    editItem: Transaction? = null,
+    onSaved: () -> Unit
+) {
     val context = LocalContext.current
-    var type by remember { mutableStateOf(initialType) }
-    var category by remember { mutableStateOf("") }
-    var amountText by remember { mutableStateOf("") }
-    var account by remember { mutableStateOf("হাতে নগদ") }
+    // সম্পাদনা: editItem থাকলে ফরম আগের তথ্য ভরা খোলে; খাত "মূল — উপখাত"
+    // আকারে সেভ থাকে বলে মূল আর উপখাত আলাদা করে নেওয়া হয়।
+    var type by remember { mutableStateOf(editItem?.type ?: initialType) }
+    var category by remember {
+        mutableStateOf(editItem?.category?.substringBefore(" — ") ?: "")
+    }
+    var subcat by remember {
+        mutableStateOf(editItem?.category?.substringAfter(" — ", "") ?: "")
+    }
+    var amountText by remember { mutableStateOf(editItem?.amount?.toString() ?: "") }
+    var account by remember { mutableStateOf(editItem?.account ?: "হাতে নগদ") }
     var accountExpanded by remember { mutableStateOf(false) }
     var accountDialog by remember { mutableStateOf<String?>(null) }
-    var note by remember { mutableStateOf(initialNote) }
-    var subcat by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf(editItem?.note ?: initialNote) }
     var showCalc by remember { mutableStateOf(false) }
     var showNewCatDialog by remember { mutableStateOf(false) }
     var newCatName by remember { mutableStateOf("") }
@@ -151,15 +163,22 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
     var catMenuFor by remember { mutableStateOf<String?>(null) }
     var catsTick by remember { mutableStateOf(0) }
     var detailsExpanded by remember { mutableStateOf(false) }
-    var dateKey by remember { mutableStateOf(todayString()) }
-    var time24 by remember { mutableStateOf(LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))) }
-    var showPayer by remember { mutableStateOf(false) }
-    var payerName by remember { mutableStateOf("") }
+    var dateKey by remember { mutableStateOf(editItem?.date ?: todayString()) }
+    var time24 by remember {
+        mutableStateOf(editItem?.time ?: LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")))
+    }
+    var showPayer by remember { mutableStateOf(editItem?.payer?.isNotBlank() ?: false) }
+    var payerName by remember { mutableStateOf(editItem?.payer ?: "") }
     var payerAddress by remember { mutableStateOf("") }
     var payerMobile by remember { mutableStateOf("") }
     // সঞ্চয় ফর্ম: জমা/উত্তোলন, মুনাফা, ব্যাংক/প্রতিষ্ঠানের তথ্য, পিন ডায়ালগ।
     var prefs by remember { mutableStateOf(loadAppPrefs(context)) }
-    var savingsDirection by remember { mutableStateOf("জমা") }
+    var savingsDirection by remember {
+        mutableStateOf(
+            if (editItem?.type == "সঞ্চয়" && editItem.direction.isNotBlank()) editItem.direction
+            else "জমা"
+        )
+    }
     var showPinDialog by remember { mutableStateOf(false) }
     var profitRate by remember { mutableStateOf("") }
     var rateType by remember { mutableStateOf("বার্ষিক") }
@@ -172,6 +191,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
     var methodMenu by remember { mutableStateOf(false) }
     val accounts by viewModel.accounts.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
+    val dueItems by viewModel.dueItems.collectAsState()
 
     val mainColor = when (type) {
         "আয়" -> GreenMain
@@ -198,7 +218,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                 "ট্রান্সফার" -> if (it.account == "হাতে নগদ") -it.amount else it.amount
                 else -> -it.amount
             }
-        }
+        } + dueLoanBalanceEffect(dueItems, "হাতে নগদ")
     val accountKind = accounts.find { it.name == account }?.kind
     val accountIcon = when {
         account == "হাতে নগদ" -> "💵"
@@ -221,7 +241,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                 "ট্রান্সফার" -> if (it.account == name) -it.amount else it.amount
                 else -> 0L
             }
-        }
+        } + dueLoanBalanceEffect(dueItems, name)
     }
 
     // সঞ্চয়ের ধরনের আগের জমা (টাইলে দেখানো হিসাবের মতো)।
@@ -235,7 +255,7 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                 it.direction == "উত্তোলন" -> -it.amount
                 else -> it.amount
             }
-        }
+        } + dueLoanBalanceEffect(dueItems, name)
     }
 
     // খাতের টাইল: ডিফল্ট খাত + নিজের খাত (অন্যান্য টাইলের আগে) + অন্যান্য (➕)।
@@ -1203,35 +1223,55 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                         finalType == "ব্যয়" || isWithdraw -> accBefore - amount
                         else -> accBefore + amount
                     }
-                    viewModel.addTransaction(
-                        Transaction(
-                            type = finalType,
-                            amount = amount,
-                            category = finalCategory,
-                            account = account,
-                            date = dateKey,
-                            time = time24,
-                            note = finalNote,
-                            payer = if (type == "সঞ্চয়") "" else payerName.trim(),
-                            direction = if (type == "সঞ্চয়") savingsDirection else ""
+                    val editing = editItem
+                    if (editing != null) {
+                        // সম্পাদনা: ওই লেনদেনটাই বদলায়, নতুন তৈরি হয় না।
+                        viewModel.updateTransaction(
+                            editing.copy(
+                                type = finalType,
+                                amount = amount,
+                                category = finalCategory,
+                                account = account,
+                                date = dateKey,
+                                time = time24,
+                                note = finalNote,
+                                payer = if (type == "সঞ্চয়") "" else payerName.trim(),
+                                direction = if (type == "সঞ্চয়") savingsDirection else "",
+                                updatedAt = System.currentTimeMillis()
+                            )
                         )
-                    )
-                    viewModel.showSavedBanner(SavedInfo(
-                        type = finalType,
-                        displayCat = displayCat,
-                        amount = amount,
-                        totalBefore = totalBefore,
-                        totalAfter = totalAfter,
-                        accountLabel = accLabel,
-                        accountBefore = accBefore,
-                        accountAfter = accAfter,
-                        isWithdraw = isWithdraw
-                    ))
-                    // জমার মতো ফরম খোলা থাকে, ব্যানার দেখায় — হোমে ফেরে না।
-                    // পরের লেনদেনের জন্য খাত/উপখাত/পরিমাণ খালি করে দিই।
-                    category = ""
-                    subcat = ""
-                    amountText = ""
+                        onSaved()
+                    } else {
+                        viewModel.addTransaction(
+                            Transaction(
+                                type = finalType,
+                                amount = amount,
+                                category = finalCategory,
+                                account = account,
+                                date = dateKey,
+                                time = time24,
+                                note = finalNote,
+                                payer = if (type == "সঞ্চয়") "" else payerName.trim(),
+                                direction = if (type == "সঞ্চয়") savingsDirection else ""
+                            )
+                        )
+                        viewModel.showSavedBanner(SavedInfo(
+                            type = finalType,
+                            displayCat = displayCat,
+                            amount = amount,
+                            totalBefore = totalBefore,
+                            totalAfter = totalAfter,
+                            accountLabel = accLabel,
+                            accountBefore = accBefore,
+                            accountAfter = accAfter,
+                            isWithdraw = isWithdraw
+                        ))
+                        // জমার মতো ফরম খোলা থাকে, ব্যানার দেখায় — হোমে ফেরে না।
+                        // পরের লেনদেনের জন্য খাত/উপখাত/পরিমাণ খালি করে দিই।
+                        category = ""
+                        subcat = ""
+                        amountText = ""
+                    }
                 },
                 enabled = canSave,
                 modifier = Modifier.fillMaxWidth(),
@@ -1242,10 +1282,14 @@ fun AddFormScreen(viewModel: AyBayViewModel, initialType: String, initialNote: S
                 )
             ) {
                 Text(
-                    text = "💾 " + tr(
-                        type + " সংরক্ষণ করুন",
-                        "Save " + if (type == "আয়") "Income" else if (type == "ব্যয়") "Expense" else "Savings"
-                    ),
+                    text = "💾 " + if (editItem != null) {
+                        tr("পরিবর্তন সংরক্ষণ করুন", "Save changes")
+                    } else {
+                        tr(
+                            type + " সংরক্ষণ করুন",
+                            "Save " + if (type == "আয়") "Income" else if (type == "ব্যয়") "Expense" else "Savings"
+                        )
+                    },
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
