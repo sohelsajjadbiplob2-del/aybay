@@ -513,7 +513,12 @@ fun HomeScreen(
                         expandedCards = if ("ব্যয়" in expandedCards) expandedCards - "ব্যয়" else expandedCards + "ব্যয়"
                     },
                     expandedLines = listOf(
-                        tr("মোট বাজেট", "Total Budget") + ": " + moneyText(totalBudgetAll),
+                        when (period) {
+                            "দৈনিক" -> tr("দৈনিক বাজেট", "Daily Budget") + ": " + moneyText(loadMonthlyBudgetDaily(context, monthKey))
+                            "সাপ্তাহিক" -> tr("সাপ্তাহিক বাজেট", "Weekly Budget") + ": " + moneyText(loadMonthlyBudgetDaily(context, monthKey) * 7)
+                            "বার্ষিক" -> tr("বার্ষিক বাজেট", "Yearly Budget") + ": " + moneyText(totalBudgetAll * 12)
+                            else -> tr("মোট বাজেট", "Total Budget") + ": " + moneyText(totalBudgetAll)
+                        },
                         tr("বাজেট সেকশনে সেট করুন", "Set in Budget section")
                     ),
                     modifier = Modifier.weight(1f),
@@ -563,12 +568,9 @@ fun HomeScreen(
                     onLedgerPeriodChange = { ledgerPeriod = it },
                     periodList = ledgerPeriodList,
                     periodTotal = ledgerPeriodTotal,
-                    groups = ledgerAnalysisGroups,
-                    hiddenCats = ledgerHiddenCats,
                     onBack = { ledgerPage = null },
                     onAdd = onAdd,
                     onShowRecycleBin = { showLedgerRecycleBin = true },
-                    onShowAnalysisEdit = { showLedgerAnalysisEdit = true },
                     onOpenReport = onOpenReport
                 )
             }
