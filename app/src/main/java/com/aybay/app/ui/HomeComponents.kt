@@ -158,7 +158,9 @@ fun JomaTotalCard(
     expandedLines: List<String>,
     modifier: Modifier = Modifier,
     // কার্ডের গায়ে চাপ দিলে লেনদেন পাতা খোলে; তালা আর ▼-এর নিজের ক্লিক আলাদা থাকে।
-    onBodyClick: (() -> Unit)? = null
+    onBodyClick: (() -> Unit)? = null,
+    // খোলা কার্ডের নিচের লাইনগুলোয় চাপ দিলে আলাদা কাজ (যেমন অটো সেট ডায়ালগ)।
+    onExpandedClick: (() -> Unit)? = null
 ) {
     Card(
         onClick = { onBodyClick?.invoke() },
@@ -218,13 +220,18 @@ fun JomaTotalCard(
             }
             if (expanded) {
                 Spacer(modifier = Modifier.height(4.dp))
-                for ((index, line) in expandedLines.withIndex()) {
-                    Text(
-                        text = line,
-                        fontSize = 12.sp,
-                        fontWeight = if (index == 0) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (index == 0) Color.Black else GreyText
-                    )
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .then(if (onExpandedClick != null) Modifier.clickable { onExpandedClick() } else Modifier)
+                ) {
+                    for ((index, line) in expandedLines.withIndex()) {
+                        Text(
+                            text = line,
+                            fontSize = 12.sp,
+                            fontWeight = if (index == 0) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (index == 0) Color.Black else GreyText
+                        )
+                    }
                 }
             }
         }
