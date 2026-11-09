@@ -15,6 +15,15 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
+// V1 → V2: লেনদেনে রিসাইকেল বিন (deletedAt) আর সঞ্চয়ের দিক (direction) যোগ।
+// পুরনো ডেটা থাকে — শুধু দুটো কলাম যোগ হয়, ডিফল্ট 0 / ফাঁকা।
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE transactions ADD COLUMN deletedAt INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE transactions ADD COLUMN direction TEXT NOT NULL DEFAULT ''")
+    }
+}
+
 // V2 → V3: বাকি/ধারে বিবরণ, নোট, অ্যাকাউন্ট আর আংশিক শোধের
 // হিসাব (paidAmount) যোগ। পুরনো ডেটা থাকে — শুধু কলাম যোগ হয়।
 val MIGRATION_2_3 = object : Migration(2, 3) {
