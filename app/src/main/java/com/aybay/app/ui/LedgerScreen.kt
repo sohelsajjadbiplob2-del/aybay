@@ -92,20 +92,17 @@ fun LedgerSection(
     onLedgerPeriodChange: (String) -> Unit,
     periodList: List<Transaction>,
     periodTotal: Long,
-    groups: List<Pair<String, Long>>,
-    hiddenCats: Set<String>,
     onBack: () -> Unit,
     onAdd: (String) -> Unit,
     onShowRecycleBin: () -> Unit,
-    onShowAnalysisEdit: () -> Unit,
     onOpenReport: () -> Unit
 ) {
     val today = LocalDate.now()
 
     val pageColor = when (type) {
-        "আয়" -> GreenMain
-        "ব্যয়" -> RedMain
-        else -> BrownMain
+        "আয়" -> LedgerGreen
+        "ব্যয়" -> LedgerRed
+        else -> LedgerBrown
     }
     val titleText = when (type) {
         "আয়" -> "🟢 " + tr("মোট আয়ের লেনদেন", "Income Transactions")
@@ -122,24 +119,13 @@ fun LedgerSection(
         "ব্যয়" -> tr("মোট ব্যয়", "Total Expense")
         else -> tr("নীট সঞ্চয়", "Net Savings")
     }
-    val typeName = when (type) {
-        "আয়" -> tr("আয়ের", "Income")
-        "ব্যয়" -> tr("ব্যয়ের", "Expense")
-        else -> tr("সঞ্চয়ের", "Savings")
-    }
     val addLabel = when (type) {
         "আয়" -> tr("নতুন আয় যোগ করুন", "Add new income")
         "ব্যয়" -> tr("নতুন ব্যয় যোগ করুন", "Add new expense")
         else -> tr("নতুন সঞ্চয় যোগ করুন", "Add new savings")
     }
-    val emptyText = when (type) {
-        "আয়" -> tr("এই সময়সীমায় কোনো আয়ের হিসাব নেই", "No income records in this period")
-        "ব্যয়" -> tr("এই সময়সীমায় কোনো ব্যয়ের হিসাব নেই", "No expense records in this period")
-        else -> tr("এই সময়সীমায় কোনো সঞ্চয়ের হিসাব নেই", "No savings records in this period")
-    }
 
     val (rangeStart, rangeEnd) = periodRange(ledgerPeriod, today)
-    val shownGroups = groups.filter { (cat, _) -> "$type|$cat" !in hiddenCats }
 
     Card(
         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
@@ -245,7 +231,7 @@ fun LedgerSection(
                 fontSize = 13.sp
             )
             Text(
-                text = rangeStart + " — " + rangeEnd,
+                text = if (ledgerPeriod == "দৈনিক") tr("আজ", "Today") + " (" + fullDateLabel(today.toString()) + ")" else rangeStart + " — " + rangeEnd,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold
             )
@@ -306,78 +292,6 @@ fun LedgerSection(
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        // খাত অনুযায়ী বিশ্লেষণ
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(modifier = Modifier.size(10.dp).background(pageColor, CircleShape))
-            Text(
-                text = typeName + " " + tr("খাত অনুযায়ী বিশ্লেষণ", "Category Analysis"),
-                modifier = Modifier.weight(1f).padding(start = 8.dp),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = tr("সম্পাদন করুন", "Edit"),
-                modifier = Modifier.clickable {
-                    HomeNavState.reportType = type
-                    onOpenReport()
-                },
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = JomaBlue
-            )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-                if (shownGroups.isEmpty()) {
-                    EmptyState("📭", emptyText)
-                } else {
-                    val maxAmt = shownGroups.maxOfOrNull { it.second } ?: 0L
-                    for ((cat, amt) in shownGroups) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier.size(30.dp)
-                                    .background(GreyBg, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(text = categoryIcon(cat), fontSize = 15.sp)
-                            }
-                            Text(
-                                text = categoryLabel(cat),
-                                modifier = Modifier.weight(1f).padding(start = 8.dp),
-                                fontSize = 14.sp
-                            )
-                            Text(
-                                text = moneyText(amt),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                        LinearProgressIndicator(
-                            progress = {
-                                if (maxAmt > 0L) (amt.toFloat() / maxAmt).coerceIn(0f, 1f) else 0f
-                            },
-                            modifier = Modifier.fillMaxWidth().height(6.dp),
-                            color = pageColor,
-                            trackColor = TrackGrey
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                    }
-                }
-            }
         }
     }
     }
@@ -526,11 +440,6 @@ fun AnalysisEditDialog(
     onToggle: (String, Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val typeName = when (type) {
-        "আয়" -> tr("আয়ের", "Income")
-        "ব্যয়" -> tr("ব্যয়ের", "Expense")
-        else -> tr("সঞ্চয়ের", "Savings")
-    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
