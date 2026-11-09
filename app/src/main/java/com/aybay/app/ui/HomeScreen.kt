@@ -93,6 +93,8 @@ object HomeNavState {
     var reportQuery: String = ""
     // বিশ্লেষণ কার্ডের "সম্পাদন করুন" থেকে রিপোর্টে যাওয়ার সময় ধরন ফিল্টার ("আয়"/"ব্যয়"/"সঞ্চয়"; খালি = সব)।
     var reportType: String = ""
+    // হোমের বাকি ও ধার সেকশনের বাক্স থেকে বাকি ও ধার পেজে যাওয়ার সময় ট্যাব ("বাকি"/"ধার"; খালি = ডিফল্ট "বাকি")।
+    var dueTab: String = ""
 }
 
 private fun totalsOf(list: List<Transaction>): Totals {
@@ -1053,9 +1055,9 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth().padding(12.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        DueBox(tr("মোট বাকি", "Total Due"), moneyText(dueTotal), YellowTint, "🛒", Modifier.weight(1f)) { onOpenDue() }
-                        DueBox(tr("ধার নেওয়া (Cash)", "Borrowed (Cash)"), moneyText(borrowed), RedTint, "🔴", Modifier.weight(1f)) { onOpenDue() }
-                        DueBox(tr("ধার দেওয়া (Cash)", "Lent (Cash)"), moneyText(lent), GreenTint, "🟢", Modifier.weight(1f)) { onOpenDue() }
+                        DueBox(tr("মোট বাকি", "Total Due"), moneyText(dueTotal), YellowTint, "🛒", Modifier.weight(1f)) { HomeNavState.dueTab = "বাকি"; onOpenDue() }
+                        DueBox(tr("ধার নেওয়া (Cash)", "Borrowed (Cash)"), moneyText(borrowed), RedTint, "🔴", Modifier.weight(1f)) { HomeNavState.dueTab = "ধার"; onOpenDue() }
+                        DueBox(tr("ধার দেওয়া (Cash)", "Lent (Cash)"), moneyText(lent), GreenTint, "🟢", Modifier.weight(1f)) { HomeNavState.dueTab = "ধার"; onOpenDue() }
                     }
                 }
                     }
