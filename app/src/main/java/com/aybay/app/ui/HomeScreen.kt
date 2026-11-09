@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -60,8 +61,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -203,6 +206,13 @@ fun HomeScreen(
     fun toggleLedger(type: String) {
         if (ledgerPage == type) ledgerPage = null else openLedger(type)
     }
+    // হোমের স্ক্রল: "সব দেখুন"-এ চাপ দিলে লেনদেন অংশটা উপরে খোলে, তাই স্ক্রল করে সেখানে নিয়ে যেতে হয়।
+    val homeListState = rememberLazyListState()
+    val homeScope = rememberCoroutineScope()
+    fun openLedgerAndShow(type: String) {
+        openLedger(type)
+        homeScope.launch { homeListState.animateScrollToItem(0) }
+    }
     // ইনলাইন লেনদেন অংশের হিসাব (বিশ্লেষণের ডায়ালগেও একই হিসাব লাগে)।
     val ledgerPeriodList = if (ledgerPage == null) emptyList() else
         ledgerFilterByPeriod(transactions, ledgerPeriod, today)
@@ -343,6 +353,7 @@ fun HomeScreen(
     }
 
     LazyColumn(
+        state = homeListState,
         modifier = Modifier.fillMaxWidth().background(PageBg).padding(horizontal = 12.dp)
     ) {
         item {
@@ -989,7 +1000,7 @@ fun HomeScreen(
                         HomeNavState.reportType = t
                         onOpenReport()
                     },
-                    onSeeAll = { toggleLedger("ব্যয়") }
+                    onSeeAll = { openLedgerAndShow("ব্যয়") }
                 )
                 CategoryAnalysisCard(
                     type = "আয়",
@@ -1000,7 +1011,7 @@ fun HomeScreen(
                         HomeNavState.reportType = t
                         onOpenReport()
                     },
-                    onSeeAll = { toggleLedger("আয়") }
+                    onSeeAll = { openLedgerAndShow("আয়") }
                 )
                 CategoryAnalysisCard(
                     type = "সঞ্চয়",
@@ -1011,7 +1022,7 @@ fun HomeScreen(
                         HomeNavState.reportType = t
                         onOpenReport()
                     },
-                    onSeeAll = { toggleLedger("সঞ্চয়") }
+                    onSeeAll = { openLedgerAndShow("সঞ্চয়") }
                 )
                     }
                         if (arrangeMode) {
