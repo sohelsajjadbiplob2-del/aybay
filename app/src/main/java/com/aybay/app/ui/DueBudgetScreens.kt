@@ -936,7 +936,8 @@ private fun NameLedgerBox(
 fun DueScreen(viewModel: AyBayViewModel, onBack: () -> Unit) {
     val items by viewModel.dueItems.collectAsState()
     val deleted by viewModel.deletedTransactions.collectAsState()
-    var tab by remember { mutableStateOf("বাকি") }
+    var tab by remember { mutableStateOf(if (HomeNavState.dueTab.isNotBlank()) HomeNavState.dueTab else "বাকি") }
+    HomeNavState.dueTab = ""
     var showBin by remember { mutableStateOf(false) }
     var showNewDue by remember { mutableStateOf(false) }
     var showLoanDialog by remember { mutableStateOf<String?>(null) }
