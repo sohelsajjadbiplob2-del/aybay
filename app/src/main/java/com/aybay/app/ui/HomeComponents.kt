@@ -569,8 +569,8 @@ fun CategoryAnalysisCard(
     val total = groups.values.sum()
     // বাছাই করা ট্যাবের রং + খাতের রঙের ক্রম (জমার মতো): ব্যয়ে লাল থেকে শুরু, আয়ে সবুজ থেকে।
     val tabColor = when (type) {
-        "ব্যয়" -> RedMain
-        "আয়" -> GreenMain
+        "ব্যয়" -> LedgerRed
+        "আয়" -> LedgerGreen
         else -> PurpleMain
     }
     val palette = when (type) {
