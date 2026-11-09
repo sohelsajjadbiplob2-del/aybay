@@ -994,8 +994,8 @@ fun DueScreen(viewModel: AyBayViewModel, onBack: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     for ((key, label, color) in listOf(
-                        Triple("বাকি", tr("🛒 বাকির লেনদেন", "🛒 Due Transactions"), OrangeMain),
-                        Triple("ধার", tr("💵 ধারের লেনদেন (Cash)", "💵 Loan Transactions (Cash)"), JomaBlue)
+                        Triple("বাকি", tr("🛒 বাকির সেকশন", "🛒 Due Section"), OrangeMain),
+                        Triple("ধার", tr("💵 ধারের সেকশন (Cash)", "💵 Loan Section (Cash)"), JomaBlue)
                     )) {
                         val selected = tab == key
                         Box(
@@ -1079,10 +1079,10 @@ fun DueScreen(viewModel: AyBayViewModel, onBack: () -> Unit) {
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                                Text(text = tr("ঋণ নেওয়া (Cash)", "Loan taken (Cash)"), fontSize = 13.sp, color = GreyText)
+                                Text(text = tr("ধার নেওয়া (Cash)", "Borrowed (Cash)"), fontSize = 13.sp, color = GreyText)
                                 Text(text = moneyText(loanTaken), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = RedMain)
                                 Text(
-                                    text = toBengaliDigits(loanTakenPeople.toString()) + " " + tr("জনের কাছ থেকে", "people"),
+                                    text = toBengaliDigits(loanTakenPeople.toString()) + " " + tr("জনের কাছে দেবো ›", "people to repay"),
                                     fontSize = 12.sp,
                                     color = GreyText
                                 )
@@ -1094,10 +1094,10 @@ fun DueScreen(viewModel: AyBayViewModel, onBack: () -> Unit) {
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                                Text(text = tr("ঋণ দেওয়া (Cash)", "Loan given (Cash)"), fontSize = 13.sp, color = GreyText)
+                                Text(text = tr("ধার দেওয়া (Cash)", "Lent (Cash)"), fontSize = 13.sp, color = GreyText)
                                 Text(text = moneyText(loanGiven), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = GreenMain)
                                 Text(
-                                    text = toBengaliDigits(loanGivenPeople.toString()) + " " + tr("জনকে দিয়েছি", "people given"),
+                                    text = toBengaliDigits(loanGivenPeople.toString()) + " " + tr("জনের কাছে পাবো ›", "people to collect from"),
                                     fontSize = 12.sp,
                                     color = GreyText
                                 )
@@ -1114,7 +1114,7 @@ fun DueScreen(viewModel: AyBayViewModel, onBack: () -> Unit) {
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = RedMain)
                         ) {
-                            Text(text = "🔴 " + tr("ঋণ নেওয়া (Cash)", "Borrow (Cash)"), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "+ " + tr("ধার নেওয়া (Cash)", "Borrow (Cash)"), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         }
                         Button(
                             onClick = { showLoanDialog = "দিয়েছি" },
@@ -1122,15 +1122,15 @@ fun DueScreen(viewModel: AyBayViewModel, onBack: () -> Unit) {
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = GreenMain)
                         ) {
-                            Text(text = "🟢 " + tr("ঋণ দেওয়া (Cash)", "Lend (Cash)"), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "+ " + tr("ধার দেওয়া (Cash)", "Lend (Cash)"), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                     SectionTitle(
-                        tr("🔴 ঋণ নেওয়া (Cash) — যাদের কাছ থেকে ঋণ নিয়েছি", "🔴 Loan Taken (Cash) — people I borrowed from")
+                        tr("🔴 ধার নেওয়া (Cash) — যাদের কাছ থেকে ধার নিয়েছি", "🔴 Borrowed (Cash) — people I borrowed from")
                     )
                 }
                 if (loanGroupsTaken.isEmpty()) {
-                    item { EmptyRow(tr("কোনো মানুষের ঋণের হিসাব নেই", "No loan record for anyone")) }
+                    item { EmptyRow(tr("কোনো চলমান ধারের হিসাব নেই", "No active loan records")) }
                 } else {
                     items(loanGroupsTaken) { (name, pair) ->
                         DueNameRow(
@@ -1144,11 +1144,11 @@ fun DueScreen(viewModel: AyBayViewModel, onBack: () -> Unit) {
                 }
                 item {
                     SectionTitle(
-                        tr("🟢 ঋণ দেওয়া (Cash) — যাদেরকে ঋণ দিয়েছি", "🟢 Loan Given (Cash) — people I lent to")
+                        tr("🟢 ধার দেওয়া (Cash) — যাদেরকে ধার দিয়েছি", "🟢 Lent (Cash) — people I lent to")
                     )
                 }
                 if (loanGroupsGiven.isEmpty()) {
-                    item { EmptyRow(tr("কোনো মানুষের ঋণের হিসাব নেই", "No loan record for anyone")) }
+                    item { EmptyRow(tr("কোনো চলমান ধারের হিসাব নেই", "No active loan records")) }
                 } else {
                     items(loanGroupsGiven) { (name, pair) ->
                         DueNameRow(
