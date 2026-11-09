@@ -68,6 +68,13 @@ val OrangeMain = Color(0xFFEA580C)
 val OrangeTint = Color(0xFFFED7AA)
 // সঞ্চয়ের বাদামি (জমা খরচের সঞ্চয় পাতা/বোতাম): গাঢ় বাদামি।
 val BrownMain = Color(0xFFA16207)
+// জমার লেজারের আসল রং (ভিডিওর ফ্রেম থেকে পিক্সেল মেপে নেওয়া): আয় গাঢ় সবুজ, ব্যয় গাঢ় লাল, সঞ্চয় সোনালি-বাদামি।
+val LedgerGreen = Color(0xFF156434)
+val LedgerRed = Color(0xFFC52727)
+val LedgerBrown = Color(0xFFA97920)
+// জমার চার্টের বারের আসল রং (ভিডিওর ফ্রেম থেকে): আয় হালকা উজ্জ্বল সবুজ, ব্যয় হালকা কোরাল লাল।
+val ChartBarGreen = Color(0xFF74D269)
+val ChartBarRed = Color(0xFFE88880)
 val PurpleTint = Color(0xFFEDE9FE)
 val PinkTint = Color(0xFFFCE7F3)
 val PinkDisc = Color(0xFFF9A8A8)
@@ -571,11 +578,11 @@ fun IncomeExpenseBars(income: Long, expense: Long) {
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         IncomeExpenseBar(
-            moneyText(income), income, max, GreenMain,
+            moneyText(income), income, max, ChartBarGreen,
             Icons.Default.ArrowUpward, tr("আয়", "Income")
         )
         IncomeExpenseBar(
-            moneyText(expense), expense, max, RedMain,
+            moneyText(expense), expense, max, ChartBarRed,
             Icons.Default.ArrowDownward, tr("ব্যয়", "Expense")
         )
     }
