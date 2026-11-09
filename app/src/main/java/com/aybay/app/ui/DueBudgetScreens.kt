@@ -35,6 +35,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -49,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aybay.app.data.Account
@@ -808,27 +810,43 @@ fun BudgetSetupDialog(
                 .associateWith { cat -> budgets.find { it.category == cat }?.limitAmount?.toString() ?: "" }
         )
     }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = "🎯 " + tr("মাসিক ও দৈনিক বাজেট সেট", "Set Monthly & Daily Budget")) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(24.dp), color = Color.White) {
+            Column(Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
+                Text(
+                    text = "🎯 " + tr("মাসিক ও দৈনিক বাজেট সেট", "Set Monthly & Daily Budget"),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = tr("মোট মাসিক বাজেট (৳)", "Total monthly budget (৳)"),
+                    fontSize = 14.sp,
+                    color = GreyText,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 6.dp)
+                )
                 OutlinedTextField(
                     value = totalText,
                     onValueChange = { v -> totalText = v.filter { it.isDigit() } },
-                    label = { Text(text = tr("মোট মাসিক বাজেট (৳)", "Total monthly budget (৳)")) },
+                    placeholder = { Text(text = "0") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
                 )
-                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = tr("দৈনিক বাজেট (৳) - ঐচ্ছিক", "Daily budget (৳) - optional"),
+                    fontSize = 14.sp,
+                    color = GreyText,
+                    modifier = Modifier.padding(top = 12.dp, bottom = 6.dp)
+                )
                 OutlinedTextField(
                     value = dailyText,
                     onValueChange = { v -> dailyText = v.filter { it.isDigit() } },
-                    label = { Text(text = tr("দৈনিক বাজেট (৳) - ঐচ্ছিক", "Daily budget (৳) - optional")) },
+                    placeholder = { Text(text = "0") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
                 )
                 Text(
                     text = tr("খাত অনুযায়ী সীমা (ঐচ্ছিক)", "Limits by category (optional)"),
@@ -851,38 +869,51 @@ fun BudgetSetupDialog(
                             onValueChange = { v ->
                                 catLimits = catLimits + (cat to v.filter { it.isDigit() })
                             },
+                            placeholder = { Text(text = "0") },
                             modifier = Modifier.width(120.dp),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
                         )
                     }
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val total = totalText.toLongOrNull() ?: 0L
-                val daily = dailyText.toLongOrNull() ?: 0L
-                saveMonthlyBudgetTotal(context, monthKey, total)
-                saveMonthlyBudgetDaily(context, monthKey, daily)
-                for ((cat, value) in catLimits) {
-                    val limit = value.toLongOrNull() ?: 0L
-                    val existing = budgets.find { it.category == cat }
-                    when {
-                        limit > 0L && existing != null ->
-                            viewModel.updateBudget(existing.copy(limitAmount = limit))
-                        limit > 0L ->
-                            viewModel.addBudget(Budget(category = cat, monthKey = monthKey, limitAmount = limit))
-                        existing != null -> viewModel.deleteBudget(existing)
-                    }
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = BudgetCancelBg)
+                    ) { Text(text = tr("বাতিল", "Cancel"), color = Color.Black) }
+                    Button(
+                        onClick = {
+                            val total = totalText.toLongOrNull() ?: 0L
+                            val daily = dailyText.toLongOrNull() ?: 0L
+                            saveMonthlyBudgetTotal(context, monthKey, total)
+                            saveMonthlyBudgetDaily(context, monthKey, daily)
+                            for ((cat, value) in catLimits) {
+                                val limit = value.toLongOrNull() ?: 0L
+                                val existing = budgets.find { it.category == cat }
+                                when {
+                                    limit > 0L && existing != null ->
+                                        viewModel.updateBudget(existing.copy(limitAmount = limit))
+                                    limit > 0L ->
+                                        viewModel.addBudget(Budget(category = cat, monthKey = monthKey, limitAmount = limit))
+                                    existing != null -> viewModel.deleteBudget(existing)
+                                }
+                            }
+                            onSaved(total, daily)
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = JomaBlue)
+                    ) { Text(text = tr("সংরক্ষণ", "Save"), color = Color.White) }
                 }
-                onSaved(total, daily)
-            }) { Text(text = tr("সংরক্ষণ", "Save")) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(text = tr("বাতিল", "Cancel")) }
+            }
         }
-    )
+    }
 }
 
 // খাত অনুযায়ী খরচের বার: ৭০% ও ৯০%-এ সাদা দাগ।
@@ -1307,19 +1338,22 @@ fun BudgetScreen(viewModel: AyBayViewModel, onBack: () -> Unit, onOpenReport: (S
                         text = tr("মাসের খরচের সীমা ঠিক করুন, সীমা পার হলে সতর্কতা পাবেন", "Set a monthly spending limit; you'll be warned if you cross it"),
                         fontSize = 13.sp,
                         color = GreyText,
-                        modifier = Modifier.padding(top = 8.dp)
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                     )
                     if (monthTotal <= 0L) {
                         Row(
                             Modifier.fillMaxWidth().padding(top = 16.dp),
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            Button(
-                                onClick = { showSetup = true },
-                                shape = RoundedCornerShape(20.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = JomaBlue)
+                            Box(
+                                Modifier.background(BudgetPillBg, RoundedCornerShape(20.dp))
+                                    .border(1.dp, TrackGrey, RoundedCornerShape(20.dp))
+                                    .clickable { showSetup = true }
+                                    .padding(horizontal = 22.dp, vertical = 10.dp),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text(text = "➕ " + tr("বাজেট সেট করুন", "Set Budget"), fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                Text(text = "➕ " + tr("বাজেট সেট করুন", "Set Budget"), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                             }
                         }
                     } else {
