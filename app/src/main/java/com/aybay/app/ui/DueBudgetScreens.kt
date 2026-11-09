@@ -842,7 +842,7 @@ fun BudgetSetupDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = categoryLabel(cat),
+                            text = categoryIcon(cat) + " " + categoryLabel(cat),
                             fontSize = 14.sp,
                             modifier = Modifier.weight(1f)
                         )
