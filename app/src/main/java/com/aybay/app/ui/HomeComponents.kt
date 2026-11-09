@@ -94,8 +94,8 @@ fun AutoCategoryChip(
 ) {
     Row(
         modifier = Modifier
-            .background(if (selected) GreenMain else Color.White, RoundedCornerShape(20.dp))
-            .border(1.dp, if (selected) GreenMain else TrackGrey, RoundedCornerShape(20.dp))
+            .background(if (selected) LedgerGreen else Color.White, RoundedCornerShape(20.dp))
+            .border(1.dp, if (selected) LedgerGreen else TrackGrey, RoundedCornerShape(20.dp))
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
