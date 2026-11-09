@@ -80,6 +80,9 @@ val FlowMaxRed = Color(0xFFE11E46)
 // অটো আয় সেট ডায়ালগের কার্ডের রং (জমা খরচের ভিডিও থেকে মাপা): মাসিক হালকা সবুজ, দৈনিক হালকা নীল-ধূসর।
 val AutoDialogGreenBg = Color(0xFFE2F6DC)
 val AutoDialogBlueBg = Color(0xFFF2F7FC)
+// জমার বাজেট কার্ডের পিল ও ডায়ালগের বাতিল বোতামের আসল রং (ছবি থেকে পিক্সেল মেপে নেওয়া)।
+val BudgetPillBg = Color(0xFFF6FAFD)
+val BudgetCancelBg = Color(0xFFEDF4FA)
 val PurpleTint = Color(0xFFEDE9FE)
 val PinkTint = Color(0xFFFCE7F3)
 val PinkDisc = Color(0xFFF9A8A8)
