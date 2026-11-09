@@ -91,6 +91,8 @@ val expenseCategories = listOf(
 // হোম থেকে রিপোর্টে যাওয়ার সময় খোঁজার শব্দ পাঠানোর জায়গা।
 object HomeNavState {
     var reportQuery: String = ""
+    // বিশ্লেষণ কার্ডের "সম্পাদন করুন" থেকে রিপোর্টে যাওয়ার সময় ধরন ফিল্টার ("আয়"/"ব্যয়"/"সঞ্চয়"; খালি = সব)।
+    var reportType: String = ""
 }
 
 private fun totalsOf(list: List<Transaction>): Totals {
@@ -553,7 +555,8 @@ fun HomeScreen(
                     onBack = { ledgerPage = null },
                     onAdd = onAdd,
                     onShowRecycleBin = { showLedgerRecycleBin = true },
-                    onShowAnalysisEdit = { showLedgerAnalysisEdit = true }
+                    onShowAnalysisEdit = { showLedgerAnalysisEdit = true },
+                    onOpenReport = onOpenReport
                 )
             }
             // দ্রুত যোগ করুন + কার্ড সাজান (লেনদেন অংশ খোলা থাকলে লুকায়)।
@@ -981,11 +984,10 @@ fun HomeScreen(
                     transactions = transactions,
                     today = today,
                     onEditCategories = { t ->
-                        customCats = loadCustomCategories(context, t)
-                        newCatText = ""
-                        editCatType = t
+                        HomeNavState.reportType = t
+                        onOpenReport()
                     },
-                    onSeeAll = onOpenReport
+                    onSeeAll = { toggleLedger("ব্যয়") }
                 )
                 CategoryAnalysisCard(
                     type = "আয়",
@@ -993,11 +995,10 @@ fun HomeScreen(
                     transactions = transactions,
                     today = today,
                     onEditCategories = { t ->
-                        customCats = loadCustomCategories(context, t)
-                        newCatText = ""
-                        editCatType = t
+                        HomeNavState.reportType = t
+                        onOpenReport()
                     },
-                    onSeeAll = onOpenReport
+                    onSeeAll = { toggleLedger("আয়") }
                 )
                 CategoryAnalysisCard(
                     type = "সঞ্চয়",
@@ -1005,11 +1006,10 @@ fun HomeScreen(
                     transactions = transactions,
                     today = today,
                     onEditCategories = { t ->
-                        customCats = loadCustomCategories(context, t)
-                        newCatText = ""
-                        editCatType = t
+                        HomeNavState.reportType = t
+                        onOpenReport()
                     },
-                    onSeeAll = onOpenReport
+                    onSeeAll = { toggleLedger("সঞ্চয়") }
                 )
                     }
                         if (arrangeMode) {
