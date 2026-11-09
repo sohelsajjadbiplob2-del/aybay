@@ -812,12 +812,13 @@ fun BudgetSetupDialog(
     }
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(24.dp), color = Color.White) {
-            Column(Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {
+            Column(Modifier.padding(20.dp)) {
                 Text(
                     text = "🎯 " + tr("মাসিক ও দৈনিক বাজেট সেট", "Set Monthly & Daily Budget"),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                 Text(
                     text = tr("মোট মাসিক বাজেট (৳)", "Total monthly budget (৳)"),
                     fontSize = 14.sp,
@@ -910,6 +911,7 @@ fun BudgetSetupDialog(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = JomaBlue)
                     ) { Text(text = tr("সংরক্ষণ", "Save"), color = Color.White) }
+                }
                 }
             }
         }
