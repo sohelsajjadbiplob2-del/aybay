@@ -1183,7 +1183,11 @@ fun HomeScreen(
                                             )
                                         }
                                         Text(
-                                            text = tr(
+                                            text = (when (t) {
+                                                "আয়" -> "💰 "
+                                                "ব্যয়" -> "💸 "
+                                                else -> "🏦 "
+                                            }) + tr(
                                                 t,
                                                 if (t == "আয়") "Income" else if (t == "ব্যয়") "Expense" else "Savings"
                                             ),
