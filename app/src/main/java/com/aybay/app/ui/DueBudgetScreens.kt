@@ -1051,8 +1051,7 @@ fun DueScreen(viewModel: AyBayViewModel, onBack: () -> Unit) {
                         Text(text = "+ " + tr("যোগ করুন (নতুন বাকি)", "Add (New Due)"), fontSize = 15.sp, fontWeight = FontWeight.Bold)
                     }
                     SectionTitle(
-                        tr("📊 বাকির তালিকা — দেখায় কি বাকি দিয়েছি", "📊 Due List — shows what I took on credit"),
-                        Modifier.padding(top = 16.dp)
+                        tr("📊 বাকির তালিকা — দেখায় কি বাকি দিয়েছি", "📊 Due List — shows what I took on credit")
                     )
                 }
                 if (dueGroups.isEmpty()) {
@@ -1127,8 +1126,7 @@ fun DueScreen(viewModel: AyBayViewModel, onBack: () -> Unit) {
                         }
                     }
                     SectionTitle(
-                        tr("🔴 ঋণ নেওয়া (Cash) — যাদের কাছ থেকে ঋণ নিয়েছি", "🔴 Loan Taken (Cash) — people I borrowed from"),
-                        Modifier.padding(top = 16.dp)
+                        tr("🔴 ঋণ নেওয়া (Cash) — যাদের কাছ থেকে ঋণ নিয়েছি", "🔴 Loan Taken (Cash) — people I borrowed from")
                     )
                 }
                 if (loanGroupsTaken.isEmpty()) {
@@ -1146,8 +1144,7 @@ fun DueScreen(viewModel: AyBayViewModel, onBack: () -> Unit) {
                 }
                 item {
                     SectionTitle(
-                        tr("🟢 ঋণ দেওয়া (Cash) — যাদেরকে ঋণ দিয়েছি", "🟢 Loan Given (Cash) — people I lent to"),
-                        Modifier.padding(top = 16.dp)
+                        tr("🟢 ঋণ দেওয়া (Cash) — যাদেরকে ঋণ দিয়েছি", "🟢 Loan Given (Cash) — people I lent to")
                     )
                 }
                 if (loanGroupsGiven.isEmpty()) {
@@ -1396,7 +1393,7 @@ fun BudgetScreen(viewModel: AyBayViewModel, onBack: () -> Unit, onOpenReport: (S
                             )
                         }
                     }
-                    SectionTitle(tr("খাত অনুযায়ী বাজেট", "Budget by Category"), Modifier.padding(top = 16.dp))
+                    SectionTitle(tr("খাত অনুযায়ী বাজেট", "Budget by Category"))
                 }
                 if (budgets.isEmpty()) {
                     item { EmptyRow(tr("এখনো কোনো বাজেট সেট করা হয়নি", "No budget set yet")) }
