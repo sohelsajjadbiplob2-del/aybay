@@ -238,7 +238,9 @@ fun ReportScreen(viewModel: AyBayViewModel, onEdit: (Transaction) -> Unit) {
     // হোমের "নাম অনুযায়ী খাতা" থেকে নামে ট্যাপ করে এলে ওই নাম দিয়ে খোঁজা শুরু হয়।
     var query by remember { mutableStateOf(HomeNavState.reportQuery) }
     HomeNavState.reportQuery = ""
-    var listType by remember { mutableStateOf("সব") }
+    // বিশ্লেষণ কার্ডের "সম্পাদন করুন" থেকে এলে ওই ধরন দিয়ে ফিল্টার শুরু হয় (জমার মতো)।
+    var listType by remember { mutableStateOf(if (HomeNavState.reportType.isNotBlank()) HomeNavState.reportType else "সব") }
+    HomeNavState.reportType = ""
     var listCat by remember { mutableStateOf("সব খাত") }
     var showBin by remember { mutableStateOf(false) }
     var repType by remember { mutableStateOf("সব") }
