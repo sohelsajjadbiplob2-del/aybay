@@ -637,7 +637,7 @@ fun HomeScreen(
             }
         }
         // লেনদেন অংশ খোলা থাকলে চার্ট লুকায় (জমার মতো)।
-        val homeSections = if (ledgerPage != null) orderedVisible.filter { it != "chart" } else orderedVisible
+        val homeSections = if (ledgerPage != null) listOf("category") else orderedVisible
         items(homeSections, key = { it }) { key ->
             val pos = homeSections.indexOf(key)
             when (key) {
@@ -993,6 +993,7 @@ fun HomeScreen(
                 "category" -> {
                     Box(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.fillMaxWidth()) {
+                if (ledgerPage == null || ledgerPage == "ব্যয়") {
                 CategoryAnalysisCard(
                     type = "ব্যয়",
                     color = JomaBlue,
@@ -1004,6 +1005,8 @@ fun HomeScreen(
                     },
                     onSeeAll = { openLedgerAndShow("ব্যয়") }
                 )
+                }
+                if (ledgerPage == null || ledgerPage == "আয়") {
                 CategoryAnalysisCard(
                     type = "আয়",
                     color = GreenMain,
@@ -1015,6 +1018,8 @@ fun HomeScreen(
                     },
                     onSeeAll = { openLedgerAndShow("আয়") }
                 )
+                }
+                if (ledgerPage == null || ledgerPage == "সঞ্চয়") {
                 CategoryAnalysisCard(
                     type = "সঞ্চয়",
                     color = PurpleMain,
@@ -1026,6 +1031,7 @@ fun HomeScreen(
                     },
                     onSeeAll = { openLedgerAndShow("সঞ্চয়") }
                 )
+                }
                     }
                         if (arrangeMode) {
                             Row(
