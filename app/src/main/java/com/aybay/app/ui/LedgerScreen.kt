@@ -308,22 +308,6 @@ fun LedgerSection(
             )
         }
         Spacer(modifier = Modifier.height(12.dp))
-        // এই সময়ের লেনদেনের তালিকা
-        if (periodList.isEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                EmptyState("📭", emptyText)
-            }
-        } else {
-            for (item in periodList) {
-                TransactionRow(item, onDelete = { viewModel.deleteTransaction(item) })
-            }
-        }
-        Spacer(modifier = Modifier.height(12.dp))
         // খাত অনুযায়ী বিশ্লেষণ
         Row(
             modifier = Modifier.fillMaxWidth(),
