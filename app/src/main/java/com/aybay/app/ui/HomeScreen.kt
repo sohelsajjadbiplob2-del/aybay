@@ -1982,21 +1982,30 @@ private fun AutoIncomeDialog(
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(36.dp).background(GreyBg, CircleShape)
+                    ) {
                         Icon(imageVector = Icons.Default.Close, contentDescription = null, tint = GreyText)
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Column(
                     modifier = Modifier.fillMaxWidth()
-                        .background(GreenTint, RoundedCornerShape(16.dp))
+                        .background(AutoDialogGreenBg, RoundedCornerShape(16.dp))
                         .padding(12.dp)
                 ) {
                     Text(
                         text = "💼 " + tr("মাসিক বেতন / আয় সেট", "Monthly Salary / Income Set"),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        color = GreenMain
+                        color = LedgerGreen
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = tr("নির্দিষ্ট তারিখে মাসিক বেতন বা আয় অটো যোগ হবে এবং ড্যাশবোর্ডে মোট আয়ের নিচে দেখা যাবে", "On the selected date, the monthly salary or income will be added automatically and shown below the total income on the dashboard"),
+                        fontSize = 13.sp,
+                        color = GreyText
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2047,8 +2056,8 @@ private fun AutoIncomeDialog(
                             val selected = monthlyDay == d
                             Box(
                                 modifier = Modifier.size(38.dp)
-                                    .background(if (selected) GreenMain else Color.White, CircleShape)
-                                    .border(1.dp, if (selected) GreenMain else TrackGrey, CircleShape)
+                                    .background(if (selected) LedgerGreen else Color.White, CircleShape)
+                                    .border(1.dp, if (selected) LedgerGreen else TrackGrey, CircleShape)
                                     .clickable {
                                         monthlyDay = d
                                         monthlyDayText = d.toString()
@@ -2111,7 +2120,7 @@ private fun AutoIncomeDialog(
                             onCheckedChange = { monthlyEnabled = it },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
-                                checkedTrackColor = GreenMain,
+                                checkedTrackColor = LedgerGreen,
                                 uncheckedThumbColor = Color.White,
                                 uncheckedTrackColor = TrackGrey
                             )
@@ -2121,13 +2130,19 @@ private fun AutoIncomeDialog(
                 Spacer(modifier = Modifier.height(12.dp))
                 Column(
                     modifier = Modifier.fillMaxWidth()
-                        .background(GreyBg, RoundedCornerShape(16.dp))
+                        .background(AutoDialogBlueBg, RoundedCornerShape(16.dp))
                         .padding(12.dp)
                 ) {
                     Text(
                         text = "📅 " + tr("ব্যবসায়ীদের জন্য প্রতিদিনের আয় সেট", "Daily Income Set for Businesses"),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = tr("প্রতিদিনের নির্ধারিত আয় সেট করুন — ড্যাশবোর্ডের মোট আয় হাইড বাটনে ক্লিক করলে দেখা যাবে", "Set a fixed daily income — tap the eye button on the dashboard total income to see it"),
+                        fontSize = 13.sp,
+                        color = GreyText
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
@@ -2191,7 +2206,7 @@ private fun AutoIncomeDialog(
                             onCheckedChange = { dailyEnabled = it },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
-                                checkedTrackColor = GreenMain,
+                                checkedTrackColor = LedgerGreen,
                                 uncheckedThumbColor = Color.White,
                                 uncheckedTrackColor = TrackGrey
                             )
@@ -2218,7 +2233,7 @@ private fun AutoIncomeDialog(
                         onClick = { saveDialog() },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = GreenMain)
+                        colors = ButtonDefaults.buttonColors(containerColor = LedgerGreen)
                     ) {
                         Text(text = tr("সংরক্ষণ করুন", "Save"), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     }
