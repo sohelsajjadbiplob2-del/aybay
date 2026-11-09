@@ -330,7 +330,7 @@ fun HomeScreen(
                 "ট্রান্সফার" -> if (it.account == acc.name) -it.amount else it.amount
                 else -> 0L
             }
-        })
+        } + dueLoanBalanceEffect(dueItems, acc.name))
     }
     val totalBalance = if (accountBalances.isEmpty()) {
         totalsAll.balance
