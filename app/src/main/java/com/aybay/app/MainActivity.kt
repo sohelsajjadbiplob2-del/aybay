@@ -42,6 +42,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,6 +73,7 @@ import com.aybay.app.ui.AyBayViewModel
 import com.aybay.app.ui.BudgetScreen
 import com.aybay.app.ui.DueScreen
 import com.aybay.app.ui.GreenDark
+import com.aybay.app.ui.HomeNavState
 import com.aybay.app.ui.HomeScreen
 import com.aybay.app.ui.JomaBlue
 import com.aybay.app.ui.PinSetDialog
@@ -143,7 +145,8 @@ fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPref
     // বেরোলেই আবার লক হয়।
     var reportUnlocked by remember { mutableStateOf(false) }
     LaunchedEffect(route) {
-        if (route != "report") reportUnlocked = false
+        // সম্পাদনা রুটে গেলেও রিপোর্ট খোলা থাকে — আবার লক হয় না।
+        if (route != "report" && !route.startsWith("edit/")) reportUnlocked = false
     }
     // ব্যানার টাইমার: সতর্ক ~২s, সফলতা ~৪.৫s পর নিজে থেকে মিলায়।
     // Tick বদলালে এফেক্ট নতুন করে শুরু হয় (আবার চাপ দিলে টাইমার রিস্টার্ট)।
@@ -288,8 +291,39 @@ fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPref
                         navController.popBackStack()
                     }
                 }
-                composable("due") { DueScreen(viewModel = viewModel) }
-                composable("budget") { BudgetScreen(viewModel = viewModel) }
+                composable(
+                    "edit/{id}",
+                    arguments = listOf(navArgument("id") { type = NavType.IntType })
+                ) { entry ->
+                    val id = entry.arguments?.getInt("id") ?: 0
+                    val transactions by viewModel.transactions.collectAsState()
+                    val item = transactions.find { it.id == id }
+                    if (item != null) {
+                        AddFormScreen(
+                            viewModel = viewModel,
+                            initialType = item.type,
+                            editItem = item
+                        ) {
+                            navController.popBackStack()
+                        }
+                    }
+                }
+                composable("due") {
+                    DueScreen(
+                        viewModel = viewModel,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable("budget") {
+                    BudgetScreen(
+                        viewModel = viewModel,
+                        onBack = { navController.popBackStack() },
+                        onOpenReport = { name ->
+                            HomeNavState.reportQuery = name
+                            navController.navigate("report")
+                        }
+                    )
+                }
                 composable("report") {
                     if ("রিপোর্ট" in prefs.lockedSections && !reportUnlocked) {
                         LockedSectionGate(
@@ -298,7 +332,10 @@ fun AyBayApp(viewModel: AyBayViewModel, prefs: AppPrefs, onPrefsChange: (AppPref
                             onUnlocked = { reportUnlocked = true }
                         )
                     } else {
-                        ReportScreen(viewModel = viewModel)
+                        ReportScreen(
+                            viewModel = viewModel,
+                            onEdit = { item -> navController.navigate("edit/" + item.id) }
+                        )
                     }
                 }
                 composable("notes") { NotesScreen(viewModel = viewModel) }
