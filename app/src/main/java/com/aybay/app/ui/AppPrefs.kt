@@ -236,3 +236,40 @@ fun allCategories(context: Context, type: String): List<String> {
     }
     return defaults + loadCustomCategories(context, type).filter { it !in defaults }
 }
+
+// মাসিক বাজেটের মোট সীমা আর দৈনিক সীমা: মাস অনুযায়ী (yyyy-MM) আলাদা
+// চাবিতে থাকে। Budget টেবিলে শুধু খাত-প্রতি সীমা থাকে, মোট/দৈনিক
+// এখানে রাখা হয়।
+fun loadMonthlyBudgetTotal(context: Context, monthKey: String): Long =
+    context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE)
+        .getLong("monthly_budget_total_" + monthKey, 0L)
+
+fun saveMonthlyBudgetTotal(context: Context, monthKey: String, total: Long) {
+    context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE).edit()
+        .putLong("monthly_budget_total_" + monthKey, total).apply()
+}
+
+fun loadMonthlyBudgetDaily(context: Context, monthKey: String): Long =
+    context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE)
+        .getLong("monthly_budget_daily_" + monthKey, 0L)
+
+fun saveMonthlyBudgetDaily(context: Context, monthKey: String, daily: Long) {
+    context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE).edit()
+        .putLong("monthly_budget_daily_" + monthKey, daily).apply()
+}
+
+// বাকি/ধারে সেভ করা নাম: "এই নাম সেভ রাখবো" চেকবক্সে টিক দিলে নাম
+// এখানে জমা হয়, পরের বার নামের ঘরে চিপ হিসেবে দেখায়। কমা দিয়ে
+// জোড়া থাকে (লক করা সেকশনের মতোই প্যাটার্ন); নামে কমা থাকা যাবে না।
+fun loadSavedDueNames(context: Context): Set<String> =
+    (context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE)
+        .getString("saved_due_names", "") ?: "")
+        .split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
+fun saveDueName(context: Context, name: String) {
+    val clean = name.trim().replace(",", "")
+    if (clean.isBlank()) return
+    val next = loadSavedDueNames(context) + clean
+    context.getSharedPreferences("aybay_prefs", Context.MODE_PRIVATE).edit()
+        .putString("saved_due_names", next.joinToString(",")).apply()
+}
