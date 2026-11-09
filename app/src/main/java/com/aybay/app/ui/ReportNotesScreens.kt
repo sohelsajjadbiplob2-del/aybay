@@ -675,8 +675,7 @@ fun ReportScreen(viewModel: AyBayViewModel, onEdit: (Transaction) -> Unit) {
                     if (debtGroupsOwe.isNotEmpty()) {
                         item {
                             SectionTitle(
-                                tr("🔴 বাকি/ধার নেওয়া", "🔴 Due/Loan taken"),
-                                Modifier.padding(top = 16.dp)
+                                tr("🔴 বাকি/ধার নেওয়া", "🔴 Due/Loan taken")
                             )
                         }
                         items(debtGroupsOwe) { (name, amount) ->
@@ -693,8 +692,7 @@ fun ReportScreen(viewModel: AyBayViewModel, onEdit: (Transaction) -> Unit) {
                     if (debtGroupsGet.isNotEmpty()) {
                         item {
                             SectionTitle(
-                                tr("🟢 বাকি/ধার দেওয়া", "🟢 Due/Loan given"),
-                                Modifier.padding(top = 16.dp)
+                                tr("🟢 বাকি/ধার দেওয়া", "🟢 Due/Loan given")
                             )
                         }
                         items(debtGroupsGet) { (name, amount) ->
