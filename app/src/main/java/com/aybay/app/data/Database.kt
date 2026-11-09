@@ -15,12 +15,14 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
-// V1 → V2: লেনদেনে রিসাইকেল বিন (deletedAt) আর সঞ্চয়ের দিক (direction) যোগ।
-// পুরনো ডেটা থাকে — শুধু দুটো কলাম যোগ হয়, ডিফল্ট 0 / ফাঁকা।
-val MIGRATION_1_2 = object : Migration(1, 2) {
+// V2 → V3: বাকি/ধারে বিবরণ, নোট, অ্যাকাউন্ট আর আংশিক শোধের
+// হিসাব (paidAmount) যোগ। পুরনো ডেটা থাকে — শুধু কলাম যোগ হয়।
+val MIGRATION_2_3 = object : Migration(2, 3) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL("ALTER TABLE transactions ADD COLUMN deletedAt INTEGER NOT NULL DEFAULT 0")
-        db.execSQL("ALTER TABLE transactions ADD COLUMN direction TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE due_items ADD COLUMN description TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE due_items ADD COLUMN note TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE due_items ADD COLUMN account TEXT NOT NULL DEFAULT 'হাতে নগদ'")
+        db.execSQL("ALTER TABLE due_items ADD COLUMN paidAmount INTEGER NOT NULL DEFAULT 0")
     }
 }
 
@@ -54,6 +56,12 @@ data class DueItem(
     val amount: Long,
     val date: String,
     val dueDate: String = "",
+    // বাকিতে কী নিয়েছি (বিবরণ), ধারে নোট/কারণ, কোন অ্যাকাউন্টে
+    // টাকা গেল/এলো, আর এখন পর্যন্ত কত শোধ হয়েছে (আংশিক শোধ)।
+    val description: String = "",
+    val note: String = "",
+    val account: String = "হাতে নগদ",
+    val paidAmount: Long = 0L,
     val isPaid: Boolean = false,
     val synced: Boolean = false
 )
@@ -139,6 +147,9 @@ interface AyBayDao {
     @Update
     suspend fun updateBudget(item: Budget)
 
+    @Delete
+    suspend fun deleteBudget(item: Budget)
+
     @Query("SELECT * FROM notes ORDER BY urgent DESC, createdAt DESC")
     fun allNotes(): Flow<List<Note>>
 
@@ -163,7 +174,7 @@ interface AyBayDao {
 
 @Database(
     entities = [Transaction::class, DueItem::class, Budget::class, Note::class, Account::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -179,7 +190,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "aybay.db"
-                ).addMigrations(MIGRATION_1_2).build()
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
                 INSTANCE = instance
                 instance
             }
