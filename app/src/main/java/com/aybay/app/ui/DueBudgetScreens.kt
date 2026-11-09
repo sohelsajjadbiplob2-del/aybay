@@ -1494,9 +1494,15 @@ fun BudgetScreen(viewModel: AyBayViewModel, onBack: () -> Unit, onOpenReport: (S
                         )) {
                             val (color, bg) = colors
                             val selected = ledgerType == key
+                            val borderColor = when (key) {
+                                "আয়" -> GreenDark
+                                "ব্যয়" -> LedgerRed
+                                else -> LedgerBrown
+                            }
                             Box(
                                 Modifier.weight(1f)
                                     .background(if (selected) color else bg, RoundedCornerShape(20.dp))
+                                    .then(if (selected) Modifier.border(2.dp, borderColor, RoundedCornerShape(20.dp)) else Modifier)
                                     .clickable { ledgerType = key }
                                     .padding(vertical = 10.dp),
                                 contentAlignment = Alignment.Center
