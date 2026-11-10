@@ -1452,7 +1452,7 @@ fun HomeScreen(
                                     modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
                                 )
                                 Button(
-                                    onClick = onOpenBudget,
+                                    onClick = { showBudgetSetup = true },
                                     shape = RoundedCornerShape(24.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = BudgetPillBtnBg,
