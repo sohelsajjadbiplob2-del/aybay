@@ -110,4 +110,6 @@ class Repository(private val dao: AyBayDao) {
     fun accounts(): Flow<List<Account>> = dao.allAccounts()
     suspend fun addAccount(item: Account): Long = dao.insertAccount(item)
     suspend fun updateAccount(item: Account) = dao.updateAccount(item)
+    suspend fun countAccountsByName(name: String): Int = dao.countAccountsByName(name)
+    suspend fun deleteDuplicateAccounts() = dao.deleteDuplicateAccounts()
 }
