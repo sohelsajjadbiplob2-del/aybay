@@ -91,7 +91,6 @@ val expenseCategories = listOf(
     "উন্নয়নমূলক খরচ", "কিস্তি", "অন্যান্য ব্যয়"
 )
 
-// হোম থেকে রিপোর্টে যাওয়ার সময় খোঁজার শব্দ পাঠানোর জায়গা।
 object HomeNavState {
     var reportQuery: String = ""
     // বিশ্লেষণ কার্ডের "সম্পাদন করুন" থেকে রিপোর্টে যাওয়ার সময় ধরন ফিল্টার ("আয়"/"ব্যয়"/"সঞ্চয়"; খালি = সব)।
@@ -120,7 +119,6 @@ private fun percentOf(part: Long, total: Long): String {
     return toBengaliDigits((part * 100 / total).toString()) + "%"
 }
 
-// লোকাল ব্যাকআপ ফাইল (Downloads/আয়-ব্যয়/backup.json) আছে কি না।
 private fun backupFileExists(): Boolean {
     return try {
         val dir = File(
@@ -180,7 +178,6 @@ fun HomeScreen(
     }
     // লক করা কার্ড খুলতে পিন ডায়ালগ: কোন কার্ড খোলা হচ্ছে ("আয়"/"ব্যয়"/"সঞ্চয়")।
     var unlockCard by remember { mutableStateOf<String?>(null) }
-    // সার্চ লক: এই সেশনে একবার খুললে আর পিন চাইবে না।
     var searchUnlocked by remember { mutableStateOf(false) }
     var showSearchPin by remember { mutableStateOf(false) }
     // তালা চাপলে কনফার্ম পপআপ: কোন কার্ড লক করতে চাওয়া হচ্ছে ("আয়"/"ব্যয়"/"সঞ্চয়")।
@@ -226,7 +223,6 @@ fun HomeScreen(
         }
         map.entries.sortedByDescending { it.value }.map { it.key to it.value }
     }
-    // লক করা কার্ডের গায়ে চাপ দিলে পিন খুলে গেলে লেনদেন অংশ খুলবে।
     var pendingLedgerAfterUnlock by remember { mutableStateOf<String?>(null) }
     var pendingAutoDialogAfterUnlock by remember { mutableStateOf(false) }
     var showBudgetSetup by remember { mutableStateOf(false) }
@@ -237,7 +233,6 @@ fun HomeScreen(
 
     var backupDone by remember { mutableStateOf(backupFileExists()) }
 
-    // কার্ড সাজান: সেকশনের ক্রম ফোনে সেভ থাকে, সব সেকশন সবসময় দেখায়।
     var arrangeMode by remember { mutableStateOf(false) }
     var sectionOrder by remember { mutableStateOf(loadHomeSectionOrder(context)) }
     val orderedVisible = sectionOrder
@@ -566,7 +561,6 @@ fun HomeScreen(
                     }
                 )
             }
-            // লেনদেন অংশ: মোট কার্ডের নিচে, হোমের ভেতরেই খোলে (জমার মতো)।
             if (ledgerPage != null) {
                 LedgerSection(
                     viewModel = viewModel,
@@ -581,7 +575,6 @@ fun HomeScreen(
                     onOpenReport = onOpenReport
                 )
             }
-            // দ্রুত যোগ করুন + কার্ড সাজান (লেনদেন অংশ খোলা থাকলে লুকায়)।
             if (ledgerPage == null) {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
@@ -643,7 +636,6 @@ fun HomeScreen(
             }
             }
         }
-        // লেনদেন অংশ খোলা থাকলে চার্ট লুকায় (জমার মতো)।
         val homeSections = if (ledgerPage != null) listOf("category") else orderedVisible
         items(homeSections, key = { it }) { key ->
             val pos = homeSections.indexOf(key)
@@ -1276,7 +1268,6 @@ fun HomeScreen(
                                 singleLine = true,
                                 shape = RoundedCornerShape(12.dp)
                             )
-                            // সার্চ বার লক থাকলে ফিল্ডে ট্যাপ করলে আগে পিন চাইবে।
                             if ("সার্চ" in loadAppPrefs(context).lockedSections && !searchUnlocked) {
                                 Box(
                                     modifier = Modifier.matchParentSize()
@@ -1596,6 +1587,17 @@ fun HomeScreen(
                             }
                         }
                         Spacer(modifier = Modifier.height(10.dp))
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(1.dp)
+                                .background(TrackGrey)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = tr("আয় বা ব্যয় যোগ করার সময় সঞ্চয়ের কোনো ধরন বেছে নিলে এখানে সেই ধরনের আলাদা ব্যালেন্স দেখা যাবে।", "If you choose a savings type when adding income or expense, the separate balance for that type will appear here."),
+                            fontSize = 14.sp,
+                            color = GreyText
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1691,7 +1693,6 @@ fun HomeScreen(
         }
         item {
             Spacer(modifier = Modifier.height(24.dp))
-            // খাত সম্পাদন ডায়ালগ
             if (editCatType != null) {
                 val type = editCatType!!
                 AlertDialog(
@@ -1820,7 +1821,6 @@ fun HomeScreen(
             onSaved = { showTransferDialog = false }
         )
     }
-    // তালা কনফার্ম পপআপ: "লক করবেন কি?"
     if (lockConfirmCard != null) {
         val confirmKey = lockConfirmCard!!
         val cardTitleBn = when (confirmKey) {
@@ -1942,7 +1942,6 @@ fun HomeScreen(
             onDismiss = { showPinDialog = false }
         )
     }
-    // সার্চ বার লক খুলতে পিন ডায়ালগ।
     if (showSearchPin) {
         PinUnlockDialog(
             prefs = loadAppPrefs(context),
