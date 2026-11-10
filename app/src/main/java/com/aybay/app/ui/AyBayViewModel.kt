@@ -168,8 +168,10 @@ class AyBayViewModel(app: Application) : AndroidViewModel(app) {
         if (defaultEnsured) return
         defaultEnsured = true
         viewModelScope.launch {
-            val current = accounts.value
-            if (current.isEmpty()) {
+            // জমে থাকা একই নামের কপি মুছে ফেলা (প্রতি নামের প্রথমটা থাকে)।
+            repo.deleteDuplicateAccounts()
+            // ডাটাবেসে নাম দিয়ে গুনে দেখা — StateFlow-এর খালি শুরুর মান দিয়ে নয়।
+            if (repo.countAccountsByName("হাতে নগদ") == 0) {
                 repo.addAccount(Account(name = "হাতে নগদ", kind = "ক্যাশ", balance = 0L))
             }
         }
