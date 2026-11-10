@@ -174,6 +174,12 @@ interface AyBayDao {
     @Query("SELECT * FROM accounts ORDER BY id ASC")
     fun allAccounts(): Flow<List<Account>>
 
+    @Query("SELECT COUNT(*) FROM accounts WHERE name = :name")
+    suspend fun countAccountsByName(name: String): Int
+
+    @Query("DELETE FROM accounts WHERE id NOT IN (SELECT MIN(id) FROM accounts GROUP BY name)")
+    suspend fun deleteDuplicateAccounts()
+
     @Insert
     suspend fun insertAccount(item: Account): Long
 
